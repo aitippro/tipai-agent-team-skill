@@ -1,0 +1,8 @@
+{
+  "name": "agent-team",
+  "description": "TipAI Agent Team Skill — 层级 Agent 团队协作系统。激活后进入 Agent Team 模式，自动执行需求采访、人物卡生成、层级组队、代码审查、冲突仲裁、满意度评估。",
+  "author": {
+    "name": "aitippro",
+    "email": "aitippro@github"
+  }
+}
