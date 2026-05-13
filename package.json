@@ -1,0 +1,13 @@
+{
+  "name": "tipai-agent-team-skill",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "test": "npx tsx tests/test_constitution.ts",
+    "check": "npx tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "typescript": "latest"
+  }
+}
