@@ -11,7 +11,7 @@
 | L4: 团队组装 | 4 | 4 | 4 | 100% |
 | L5: 任务下发 | 4 | 4 | 4 | 100% |
 | L6: 代码审查 | 6 | 6 | 6 | 100% |
-| L7: 冲突仲裁 | 7 | 0 | 0 | 0% |
+| L7: 冲突仲裁 | 7 | 7 | 7 | 100% |
 | L8: 上下文控制 | 5 | 0 | 0 | 0% |
 | L9: 满意度系统 | 4 | 0 | 0 | 0% |
 | L10: 生命周期 | 3 | 0 | 0 | 0% |
@@ -19,7 +19,7 @@
 | L12: 容错机制 | 5 | 0 | 0 | 0% |
 | L13: 项目档案 | 3 | 0 | 0 | 0% |
 | L14: 集成验证 | 6 | 0 | 0 | 0% |
-| **合计** | **77** | **38** | **38** | **49%** |
+| **合计** | **77** | **45** | **45** | **58%** |
 
 ---
 
@@ -244,55 +244,38 @@
 ## Layer 7: 冲突检测与仲裁
 
 ### T-0039: 接口冲突检测器
-- [ ] 完成
-- [ ] 验证
-- 组长间通信交换接口定义时自动对比
-- 字段名/类型/结构不一致 → 判定冲突
+- [x] 完成 — 2026-05-13，实现文件: `src/conflict-arbitrator.ts` (detect_interface_conflict, detect_all_interface_conflicts, types_compatible)，自测: 通过
+- [x] 验证 — 2026-05-13，QA: 9用例全通过，覆盖: 兼容类型(number/int/varchar/string)/字段缺失/类型不兼容/optional不一致/severity分级(1个delayed,≥2blocking)/批量两两对比/完全一致/B侧多余字段
 - 符合度: ✅ 无偏离
 
 ### T-0040: 数据冲突检测器
-- [ ] 完成
-- [ ] 验证
-- 以数据组长 schema 为权威源
-- 其他组写操作 vs schema → 不一致即冲突
-- 数据组长为裁决方
+- [x] 完成 — 2026-05-13，实现文件: `src/conflict-arbitrator.ts` (detect_data_conflict, DataSchema, WriteOperation)，自测: 通过
+- [x] 验证 — 2026-05-13，QA: 9用例全通过，覆盖: 合法操作/表不存在blocking/列不存在/类型不匹配/INSERT非空列检查/UPDATE不检查非空/兼容数据类型/数据权威标记/parties双方
 - 符合度: ✅ 无偏离
 
 ### T-0041: 约定冲突检测器
-- [ ] 完成
-- [ ] 验证
-- 组长审查成员代码时逐条比对全局约定表
-- 偏离 ≥3 处 → 上报主Agent
+- [x] 完成 — 2026-05-13，实现文件: `src/conflict-arbitrator.ts` (detect_convention_violations, should_escalate_convention, create_convention_conflict)，自测: 通过
+- [x] 验证 — 2026-05-13，QA: 10用例全通过，覆盖: 合规无违规/缺少required_pattern/forbidden_pattern(console.log+process.exit)/行号检测/≥3上报/＜3不上报/冲突记录含名+数/≥5blocking/＜5delayed
 - 符合度: ✅ 无偏离
 
 ### T-0042: 逻辑冲突检测器
-- [ ] 完成
-- [ ] 验证
-- 主Agent 持"业务规则→实现位置"映射表
-- 同一规则出现两个不同实现 → 判定冲突
+- [x] 完成 — 2026-05-13，实现文件: `src/conflict-arbitrator.ts` (detect_logic_conflict, generate_implementation_fingerprint, RuleImplementation)，自测: 通过
+- [x] 验证 — 2026-05-13，QA: 9用例全通过，覆盖: 不同组不同fingerprint冲突/相同fingerprint无冲突/不同规则无冲突/同组不算冲突/多规则多冲突/含parties和位置/fingerprint相同结构代码相同/不同结构不同/忽略注释
 - 符合度: ✅ 无偏离
 
 ### T-0043: 仲裁决策引擎
-- [ ] 完成
-- [ ] 验证
-- 技术性冲突 → 需求文档+全局约定 → 判偏离方
-- 两方合理路径不同 → 主Agent 选最优 + 理由
-- 需求模糊 → 两套方案让客户选
+- [x] 完成 — 2026-05-13，实现文件: `src/conflict-arbitrator.ts` (arbitrate, ArbitrationDecision, ArbitrationPath)，自测: 通过
+- [x] 验证 — 2026-05-13，QA: 9用例全通过，覆盖: convention→side_a/data→side_b/interface+需求→compromise/interface无需求→client_decision/logic评分选A/logic评分选B/无context默认side_a/全类型有decided_at/convention含convention_update
 - 符合度: ✅ 无偏离
 
 ### T-0044: 协商超时检测
-- [ ] 完成
-- [ ] 验证
-- 组长间协商 2 轮上限
-- 超时自动升级 → 暂停相关成员任务
+- [x] 完成 — 2026-05-13，实现文件: `src/conflict-arbitrator.ts` (create_negotiation, record_negotiation_round, check_negotiation_timeout, escalate_to_main_agent)，自测: 通过
+- [x] 验证 — 2026-05-13，QA: 10用例全通过，覆盖: 创建状态/自定义max_rounds/记录一轮/超max_rounds自动escalated/达上限检测超时/未达不超时/已escalated不超时/已resolved不超时/30分钟超时/升级暂停组
 - 符合度: ✅ 无偏离
 
 ### T-0045: 仲裁结果写入
-- [ ] 完成
-- [ ] 验证
-- 全局约定表更新
-- 冲突双方人物卡打标记
-- 仲裁记录写入项目档案
+- [x] 完成 — 2026-05-13，实现文件: `src/conflict-arbitrator.ts` (apply_arbitration_result, ArbitrationResult, DEFAULT_CONVENTIONS, run_conflict_detection_pipeline)，自测: 通过
+- [x] 验证 — 2026-05-13，QA: 12用例全通过(含集成3用例)，覆盖: 有convention_update更新约定/无更新不新增/冲突方卡打标记/不相关方不标记/archive含已仲裁标记/compromise→negotiation/client_decision→client_decision/side_a→lead_arbitration/result完整性/DEFAULT_CONVENTIONS8条/全链路pipeline/空输入
 - 符合度: ✅ 无偏离
 
 ---
