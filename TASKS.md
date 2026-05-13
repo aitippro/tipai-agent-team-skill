@@ -9,7 +9,7 @@
 | L2: 需求采访 | 6 | 6 | 6 | 100% |
 | L3: 人物卡生成 | 6 | 6 | 6 | 100% |
 | L4: 团队组装 | 4 | 4 | 4 | 100% |
-| L5: 任务下发 | 4 | 0 | 0 | 0% |
+| L5: 任务下发 | 4 | 4 | 4 | 100% |
 | L6: 代码审查 | 6 | 0 | 0 | 0% |
 | L7: 冲突仲裁 | 7 | 0 | 0 | 0% |
 | L8: 上下文控制 | 5 | 0 | 0 | 0% |
@@ -19,7 +19,7 @@
 | L12: 容错机制 | 5 | 0 | 0 | 0% |
 | L13: 项目档案 | 3 | 0 | 0 | 0% |
 | L14: 集成验证 | 6 | 0 | 0 | 0% |
-| **合计** | **77** | **28** | **28** | **36%** |
+| **合计** | **77** | **32** | **32** | **42%** |
 
 ---
 
@@ -186,33 +186,23 @@
 ## Layer 5: 任务下发系统
 
 ### T-0029: 阶段任务卡生成器
-- [ ] 完成
-- [ ] 验证
-- 主Agent 拆阶段 → 生成阶段任务卡
-- 每卡包含: 目标/验收标准/交付时间/依赖/约束
+- [x] 完成 — 2026-05-13，实现文件: `src/task-distributor.ts` (generate_stage_task_cards, StageDefinition, get_group_stage_cards, get_active_stage)，自测: 通过
+- [x] 验证 — 2026-05-13，QA: 10用例全通过，覆盖: 3组x5阶段=15卡/from=主Agent/to=组长名/stage_id含组名/验收≥2/deadline ISO/约束条件/自定义阶段/组过滤/活跃阶段
 - 符合度: ✅ 无偏离
 
 ### T-0030: 模块任务卡生成器
-- [ ] 完成
-- [ ] 验证
-- 组长拆阶段卡 → 生成模块任务卡
-- 每卡包含: 具体任务列表/输出格式/对接上下游/禁止事项
+- [x] 完成 — 2026-05-13，实现文件: `src/task-distributor.ts` (generate_module_task_card, derive_module_tasks, derive_output_format)，自测: 通过
+- [x] 验证 — 2026-05-13，QA: 10用例全通过，覆盖: module_id关联/from-to验证/tasks≥3/deadline继承/output_format推导/forbidden隔离/附加forbidden/must_interface/已知模块/未知模块通用
 - 符合度: ✅ 无偏离
 
 ### T-0031: 任务下发协议
-- [ ] 完成
-- [ ] 验证
-- 不可越级: 主Agent→组长→成员，不可跳过
-- 单任务上限: 每成员同时只持 1 张模块卡
-- 超时检测: 距 deadline 剩 30% → 组长主动问进度
-- 紧急插队: 主Agent→组长 P0 插入
+- [x] 完成 — 2026-05-13，实现文件: `src/task-distributor.ts` (DispatchState, create_dispatch_state, can_dispatch_to, dispatch_task, complete_task, check_timeout_risk, batch_check_timeout, insert_emergency, consume_emergency_queue, validate_dispatch_chain)，自测: 通过
+- [x] 验证 — 2026-05-13，QA: 14用例全通过，覆盖: 空状态创建/可下发判断/占位成功/重复占位拒绝/释放成员/超时检测(on_track/at_risk/overdue)/批量检测/紧急插队/按组消费/合法链路验证/越级检测/stage_id不匹配检测
 - 符合度: ✅ 无偏离
 
 ### T-0032: 进度汇报链
-- [ ] 完成
-- [ ] 验证
-- 成员→组长: 每日自动汇报 (做了什么/问题/在轨?)
-- 组长→主Agent: 阶段进度摘要 (完成率/阻塞/异常成员)
+- [x] 完成 — 2026-05-13，实现文件: `src/task-distributor.ts` (create_member_progress_report, create_stage_progress_summary, is_report_overdue, aggregate_progress)，自测: 通过
+- [x] 验证 — 2026-05-13，QA: 11用例全通过，覆盖: 成员汇报含关键字段/日期为今天/正常汇总/偏离轨道检测/空汇报检测/无阻塞/超24h检测/刚刚不过期/多组汇总/完整链路
 - 符合度: ✅ 无偏离
 
 ---
