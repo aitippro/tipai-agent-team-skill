@@ -5,7 +5,7 @@
 | 层级 | 总任务 | 已完成 | 已验证 | 进度 |
 |---|---|---|---|---|
 | L0: Skill容器 | 3 | 3 | 3 | 100% |
-| L1: 数据结构 | 9 | 0 | 0 | 0% |
+| L1: 数据结构 | 9 | 3 | 3 | 33% |
 | L2: 需求采访 | 6 | 0 | 0 | 0% |
 | L3: 人物卡生成 | 6 | 0 | 0 | 0% |
 | L4: 团队组装 | 4 | 0 | 0 | 0% |
@@ -19,7 +19,7 @@
 | L12: 容错机制 | 5 | 0 | 0 | 0% |
 | L13: 项目档案 | 3 | 0 | 0 | 0% |
 | L14: 集成验证 | 6 | 0 | 0 | 0% |
-| **合计** | **77** | **3** | **3** | **3%** |
+| **合计** | **77** | **6** | **6** | **7%** |
 
 ---
 
@@ -45,28 +45,18 @@
 ## Layer 1: 核心数据结构
 
 ### T-0004: PersonaCard Schema
-- [ ] 完成
-- [ ] 验证
-- 定义人物卡完整 JSON Schema
-- 字段: name, role, summary, must_do[], must_not_do[], tech_env{}, input_sources[], output_targets[], behavior_rules[], permission_mode
-- 验证标准: Schema 能通过 T-0005 的用例验证
+- [x] 完成 — 2026-05-13，实现文件: `src/schemas.ts` (PersonaCard + 全部关联类型)，自测: 通过
+- [x] 验证 — 2026-05-13，QA: 20个用例(含T-0005/T-0006)全通过，类型完整性验证通过
 - 符合度: ✅ 无偏离
 
 ### T-0005: PersonaCard 生成时验证
-- [ ] 完成
-- [ ] 验证
-- 必填字段不得为空
-- must_do 至少 3 条
-- must_not_do 至少 2 条
-- behavior_rules 默认包含"越界回复"和"不确定回复"两条
-- permission_mode 默认 "bypassPermissions"
+- [x] 完成 — 2026-05-13，实现文件: `src/validation.ts`，自测: 通过
+- [x] 验证 — 2026-05-13，QA: 14条验证规则全通过(空字段/数量/越界回复/模式校验)
 - 符合度: ✅ 无偏离
 
 ### T-0006: TaskCard Schema (阶段/模块)
-- [ ] 完成
-- [ ] 验证
-- 阶段任务卡: stage_id, from, to, goal, acceptance_criteria[], deadline, dependencies[], constraints[]
-- 模块任务卡: module_id, from, to, tasks[], output_format, deadline, must_interface[], forbidden[]
+- [x] 完成 — 2026-05-13，实现文件: `src/schemas.ts` (StageTaskCard + ModuleTaskCard)，自测: 通过
+- [x] 验证 — 2026-05-13，QA: 阶段卡+模块卡验证规则全通过，含空值边界测试
 - 符合度: ✅ 无偏离
 
 ### T-0007: StructuredArchive Schema

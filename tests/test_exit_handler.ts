@@ -21,7 +21,7 @@ const cards: PersonaCard[] = [
   {
     name: "林一舟", role: "后端组长", summary: "后端技术把关",
     must_do: ["审查代码"], must_not_do: ["写细节代码"],
-    tech_env: { lang: "Go" },
+    tech_env: { language: "Go" },
     input_sources: [{ from: "主Agent", format: "阶段任务卡" }],
     output_targets: [{ to: "后端成员", format: "模块任务卡" }],
     behavior_rules: ["越界回复"], permission_mode: "bypassPermissions",
@@ -30,7 +30,7 @@ const cards: PersonaCard[] = [
   {
     name: "张思远", role: "后端成员", summary: "支付模块",
     must_do: ["支付API"], must_not_do: ["碰数据库"],
-    tech_env: { lang: "Go" },
+    tech_env: { language: "Go" },
     input_sources: [{ from: "后端组长", format: "模块任务卡" }],
     output_targets: [{ to: "后端组长", format: "代码" }],
     behavior_rules: ["越界回复"], permission_mode: "bypassPermissions",
