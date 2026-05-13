@@ -3,11 +3,11 @@
  */
 import {
   create_interview_state, advance_phase, go_back_phase,
-  InterviewState, InterviewPhase,
-  is_vague_answer, IMAGE_TEMPLATE, TECH_TEMPLATE, FEATURE_TEMPLATE,
-  recommend_tech_stack, TechRecommendation,
+  InterviewPhase,
+  is_vague_answer, IMAGE_TEMPLATE,
+  recommend_tech_stack,
   detect_complexity, get_most_complex,
-  generate_summary, format_summary, InterviewSummary,
+  generate_summary, format_summary,
   create_confirm_state, handle_confirm, handle_modify, is_interview_done,
 } from "../src/interview";
 

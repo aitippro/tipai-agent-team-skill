@@ -58,7 +58,7 @@ test("T-0051: 单成员打分 - 完美表现", () => {
     result.scores.standard === 5 &&
     result.scores.collaboration === 5 &&
     result.scores.bonus === 2 &&
-    result.scores.composite > 4.0; // 5*0.4+5*0.3+5*0.2+2*0.1*2=4.7
+    result.scores.composite > 4.0; // 5*0.4+5*0.3+5*0.2+2*0.1=4.7
 });
 
 test("T-0051: 单成员打分 - 差表现", () => {

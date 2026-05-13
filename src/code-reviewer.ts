@@ -150,7 +150,9 @@ export function detect_boundary_omission(code: string): CodeIssue[] {
   }
 
   // 数组/集合操作无边界检查
-  if (code.includes("[") && code.includes("]") && !code.includes(".length") && !code.includes("?.") && !code.includes("at(")) {
+  // 排除：解构赋值 (const [a,b])、数组字面量 ([1,2])、可选链(?.)、at()安全访问
+  const is_destructuring = /\b(?:const|let|var)\s*\[/.test(code) || /\(\s*\[/.test(code);
+  if (!is_destructuring && code.includes("[") && code.includes("]") && !code.includes(".length") && !code.includes("?.") && !code.includes("at(")) {
     const line = find_line_containing(code, "[");
     issues.push({
       type: "fake",
@@ -406,6 +408,40 @@ export function detect_empty_implementation(code: string, function_name?: string
   return issues;
 }
 
+/**
+ * 关键常量未填充: 常量定义为占位符值，从未被实际赋值
+ */
+export function detect_unfilled_constants(code: string): CodeIssue[] {
+  const issues: CodeIssue[] = [];
+  const lines = code.split("\n");
+
+  const placeholder_values = [
+    /^["'](?:TODO|FIXME|placeholder|default|xxx|test|example|sample|changeme|replace_me|TBD)["']$/i,
+    /^["']['"]$/,
+  ];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    const const_match = line.match(/^(?:export\s+)?(?:const|let|var)\s+([A-Z_][A-Z0-9_]*)\s*(?::\s*\w+\s*)?=\s*(.+?)[\s;]*$/);
+    if (const_match) {
+      const name = const_match[1];
+      const value = const_match[2].trim();
+      if (placeholder_values.some((p) => p.test(value))) {
+        issues.push({
+          type: "empty",
+          subtype: "关键常量未填充",
+          severity: "medium",
+          line: i + 1,
+          description: `常量 ${name} 的值为占位符: ${value}`,
+          suggestion: "替换为实际的配置值",
+        });
+      }
+    }
+  }
+
+  return issues;
+}
+
 // ============ T-0035: 无价值代码检测器 ============
 
 /**
@@ -539,6 +575,41 @@ export function detect_unused_imports(code: string): CodeIssue[] {
 }
 
 /**
+ * 过度包装: 函数体仅调用另一个同签名函数，无任何转换
+ */
+export function detect_over_wrapping(code: string): CodeIssue[] {
+  const issues: CodeIssue[] = [];
+  const funcs = extract_functions_with_params(code);
+
+  for (const func of funcs) {
+    if (!func.body || func.params.length === 0) continue;
+
+    const body_lines = func.body.trim().split("\n").filter((l) => l.trim().length > 0);
+    if (body_lines.length !== 1) continue;
+
+    const single_line = body_lines[0].trim();
+    const call_match = single_line.match(/^return\s+(\w+)\(([^)]*)\);?$/);
+    if (call_match) {
+      const called_params = call_match[2].split(",").map((p) => p.trim()).filter(Boolean);
+      const same_params = func.params.length === called_params.length &&
+        func.params.every((p, i) => called_params[i] === p);
+      if (same_params && call_match[1] !== func.name) {
+        issues.push({
+          type: "worthless",
+          subtype: "过度包装",
+          severity: "low",
+          line: func.start_line,
+          description: `函数 ${func.name} 仅透传调用 ${call_match[1]}，无任何转换`,
+          suggestion: `直接使用 ${call_match[1]} 而非多一层包装`,
+        });
+      }
+    }
+  }
+
+  return issues;
+}
+
+/**
  * 综合无价值代码检测 (涵盖6个子类)
  */
 export function detect_worthless_code(
@@ -548,6 +619,7 @@ export function detect_worthless_code(
   return [
     ...detect_dead_code(code),
     ...detect_no_side_effect_writes(code),
+    ...detect_over_wrapping(code),
     ...detect_copy_paste_residue(code, sibling_codes),
     ...detect_unused_imports(code),
   ];
@@ -564,7 +636,7 @@ export function detect_hardcoded_return(code: string): CodeIssue[] {
 
   for (const func of funcs) {
     if (func.params.length > 0 && func.body) {
-      const params_used = func.params.some((p) => func.body!.includes(p));
+      const params_used = func.params.some((p) => func.body?.includes(p) ?? false);
       const has_return = func.body.includes("return");
 
       if (has_return && !params_used) {
@@ -755,6 +827,40 @@ export function detect_fake_validation(code: string): CodeIssue[] {
 }
 
 /**
+ * 假随机/假计算: 声称复杂计算但内部是 random() 或简单估算
+ */
+export function detect_fake_computation(code: string): CodeIssue[] {
+  const issues: CodeIssue[] = [];
+  const lines = code.split("\n");
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (/return\s+.*(?:Math\.random|random\(\)|rand\(\)|rand\.)/.test(line)) {
+      issues.push({
+        type: "cheating",
+        subtype: "假随机/假计算",
+        severity: "high",
+        line: i + 1,
+        description: "函数返回值基于随机数，而非真实计算",
+        suggestion: "实现真实的业务计算逻辑，而非用随机数伪装",
+      });
+    }
+    if (/(?:result|output|value|score|total|amount)\s*=\s*.*(?:Math\.random|random\(\)|rand\()/.test(line)) {
+      issues.push({
+        type: "cheating",
+        subtype: "假随机/假计算",
+        severity: "high",
+        line: i + 1,
+        description: "计算结果基于随机数生成，而非真实业务逻辑",
+        suggestion: "使用正确的业务规则计算结果值",
+      });
+    }
+  }
+
+  return issues;
+}
+
+/**
  * 综合糊弄代码检测 (涵盖6个子类)
  */
 export function detect_cheating_code(
@@ -768,6 +874,7 @@ export function detect_cheating_code(
     ...detect_requirement_code_mismatch(code, expected_rules || []),
     ...detect_pass_through(code),
     ...detect_fake_validation(code),
+    ...detect_fake_computation(code),
   ];
 }
 
@@ -854,6 +961,7 @@ export function generate_review_report(
   const issues: CodeIssue[] = [
     ...detect_fake_implementation(code, requirements),
     ...detect_empty_implementation(code),
+    ...detect_unfilled_constants(code),
     ...detect_worthless_code(code, sibling_codes),
     ...detect_cheating_code(code, expected_rules),
   ];
@@ -1068,14 +1176,14 @@ function extract_body(code: string, start_index: number): string {
   return remaining.substring(0, end_index);
 }
 
-function normalize_code(code: string): string {
+export function normalize_code(code: string): string {
   return code
-    .replace(/\/\/.*$/gm, "") // 去除单行注释
-    .replace(/\/\*[\s\S]*?\*\//g, "") // 去除多行注释
-    .replace(/\s+/g, " ") // 合并空白
-    .replace(/['"`]/g, "'") // 统一引号
-    .replace(/\b[a-zA-Z_]\w+\b/g, "_ID_") // 替换所有标识符为占位符
-    .replace(/\b\d+\b/g, "_NUM_") // 替换数字
+    .replace(/\/\/.*$/gm, "")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/\s+/g, " ")
+    .replace(/['"`]/g, "'")
+    .replace(/\b[a-zA-Z_]\w*\b/g, "_ID_")
+    .replace(/\b\d+\b/g, "_NUM_")
     .trim();
 }
 

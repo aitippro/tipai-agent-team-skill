@@ -9,7 +9,7 @@
  * T-0024: 人物卡客户确认流程
  */
 
-import { PersonaCard, TechEnv, LifecycleMode } from "./schemas";
+import { PersonaCard, TechEnv, LifecycleMode, MAX_MEMBERS_PER_GROUP } from "./schemas";
 import { InterviewSummary } from "./interview";
 
 // ============ T-0022: 随机姓名库 ============
@@ -59,6 +59,44 @@ export interface LayerDefinition {
   tech_stack: string;
 }
 
+const FRONTEND_TECH = new Set([
+  "react", "vue", "angular", "next.js", "nuxt.js", "svelte", "tailwind",
+  "bootstrap", "vite", "webpack", "remix", "typescript", "javascript",
+]);
+
+const BACKEND_TECH = new Set([
+  "go", "golang", "java", "python", "node.js", "express", "nestjs", "nest.js",
+  "django", "flask", "fastapi", "spring", "ruby", "rails", "rust", "php",
+  "laravel", "gin", "echo", "fiber", ".net", "c#", "kotlin", "elixir",
+  "phoenix", "hono", "koa", "typescript", "javascript",
+]);
+
+const DATA_TECH = new Set([
+  "postgresql", "mysql", "mongodb", "redis", "sqlite", "oracle",
+  "elasticsearch", "cassandra", "dynamodb", "firebase", "supabase",
+  "prisma", "typeorm", "sequelize", "mariadb", "clickhouse",
+]);
+
+const DEVOPS_TECH = new Set([
+  "docker", "kubernetes", "k8s", "aws", "gcp", "azure", "terraform",
+  "ansible", "jenkins", "nginx", "prometheus", "grafana", "vercel", "netlify",
+]);
+
+const LAYER_TECH_MAP: Record<string, Set<string>> = {
+  "前端层": FRONTEND_TECH,
+  "后端层": BACKEND_TECH,
+  "数据层": DATA_TECH,
+  "DevOps层": DEVOPS_TECH,
+};
+
+function filter_tech_for_layer(full_tech: string, layer_name: string): string {
+  const techs = full_tech.split(/\s*[+,/]\s*/).map(t => t.trim()).filter(Boolean);
+  const layer_set = LAYER_TECH_MAP[layer_name];
+  if (!layer_set) return full_tech;
+  const matched = techs.filter(t => layer_set.has(t.toLowerCase()));
+  return matched.length > 0 ? matched.join(" + ") : full_tech;
+}
+
 export function decompose_to_layers(summary: InterviewSummary): LayerDefinition[] {
   const layers: LayerDefinition[] = [];
 
@@ -69,7 +107,7 @@ export function decompose_to_layers(summary: InterviewSummary): LayerDefinition[
     layers.push({
       name: layer_name,
       modules,
-      tech_stack,
+      tech_stack: filter_tech_for_layer(tech_stack, layer_name),
     });
   }
 
@@ -309,7 +347,8 @@ export function generate_team(summary: InterviewSummary): { leads: PersonaCard[]
     const lead = generate_team_lead_card(layer);
     leads.push(lead);
 
-    for (const module of layer.modules) {
+    const member_modules = layer.modules.slice(0, MAX_MEMBERS_PER_GROUP);
+    for (const module of member_modules) {
       const member = generate_member_card(module, layer, ["不碰其他模块细节"]);
       members.push(member);
     }

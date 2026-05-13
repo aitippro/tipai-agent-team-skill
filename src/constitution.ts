@@ -5,7 +5,7 @@
  * 违反第〇条(跳出容器) → 返回 {pass: false, halt: true}
  */
 
-export type AgentRole = "lead" | "team_lead" | "member";
+import { AgentRole } from "./schemas";
 
 export interface AgentAction {
   role: AgentRole;

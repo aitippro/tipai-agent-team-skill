@@ -8,6 +8,11 @@
  */
 
 import { SatisfactionRecord, SatisfactionScore, ClientModification } from "./schemas";
+
+const W_QUALITY = 0.4;
+const W_STANDARD = 0.3;
+const W_COLLABORATION = 0.2;
+const W_BONUS = 0.1;
 import { PersonaCard } from "./schemas";
 
 // ============ T-0051: 主Agent打分引擎 ============
@@ -23,6 +28,8 @@ export interface ScoringInput {
   collaboration: number; // 1-5
   /** 加分项 - 超预期/优化/创新 */
   bonus_items: string[];
+  /** 加分项综合分 - 按质量评估(0-5)，不提供时按数量估算 */
+  bonus_score?: number;
   /** 扣分项 */
   penalty_items: string[];
 }
@@ -41,8 +48,10 @@ export function score_member(input: ScoringInput): ScoringOutput {
   const standard = clamp_score(input.code_quality);
   const collaboration = clamp_score(input.collaboration);
 
-  // 加分项: 每项 0-1 分，最多 5 分
-  const bonus = Math.min(input.bonus_items.length, 5);
+  // 加分项: 优先使用 bonus_score（质量评估），否则按数量估算(每项1分，最多5分)
+  const bonus = input.bonus_score !== undefined
+    ? clamp_score(input.bonus_score)
+    : Math.min(input.bonus_items.length, 5);
 
   // 扣分项不单独减分，而是在原因中体现
   const reasons: string[] = [];
@@ -79,7 +88,7 @@ export function score_member(input: ScoringInput): ScoringOutput {
     reasons.push(`问题项: ${input.penalty_items.join(", ")}`);
   }
 
-  const composite = round2(quality * 0.4 + standard * 0.3 + collaboration * 0.2 + bonus * 0.1 * 2);
+  const composite = round_to_2(quality * W_QUALITY + standard * W_STANDARD + collaboration * W_COLLABORATION + bonus * W_BONUS);
 
   const scores: SatisfactionScore = {
     quality,
@@ -101,17 +110,17 @@ export function score_all_members(
   const member_details = inputs.map(score_member);
 
   // 组长分 = 成员分平均值
-  const avg_q = avg(member_details.map((m) => m.scores.quality));
-  const avg_s = avg(member_details.map((m) => m.scores.standard));
-  const avg_c = avg(member_details.map((m) => m.scores.collaboration));
-  const avg_b = avg(member_details.map((m) => m.scores.bonus));
+  const avg_q = calc_avg(member_details.map((m) => m.scores.quality));
+  const avg_s = calc_avg(member_details.map((m) => m.scores.standard));
+  const avg_c = calc_avg(member_details.map((m) => m.scores.collaboration));
+  const avg_b = calc_avg(member_details.map((m) => m.scores.bonus));
 
   const lead_scores: SatisfactionScore = {
-    quality: round2(avg_q),
-    standard: round2(avg_s),
-    collaboration: round2(avg_c),
-    bonus: round2(avg_b),
-    composite: round2(avg_q * 0.4 + avg_s * 0.3 + avg_c * 0.2 + avg_b * 0.1 * 2),
+    quality: round_to_2(avg_q),
+    standard: round_to_2(avg_s),
+    collaboration: round_to_2(avg_c),
+    bonus: round_to_2(avg_b),
+    composite: round_to_2(avg_q * W_QUALITY + avg_s * W_STANDARD + avg_c * W_COLLABORATION + avg_b * W_BONUS),
   };
 
   return { member_details, lead_scores };
@@ -519,20 +528,20 @@ function clamp_score(v: number): number {
   return Math.max(1, Math.min(5, Math.round(v)));
 }
 
-function round2(v: number): number {
+function round_to_2(v: number): number {
   return Math.round(v * 100) / 100;
 }
 
-function avg(nums: number[]): number {
+function calc_avg(nums: number[]): number {
   if (nums.length === 0) return 0;
   return nums.reduce((a, b) => a + b, 0) / nums.length;
 }
 
 function recalculate_composite(scores: SatisfactionScore): number {
-  return round2(
-    scores.quality * 0.4 +
-    scores.standard * 0.3 +
-    scores.collaboration * 0.2 +
-    scores.bonus * 0.1 * 2
+  return round_to_2(
+    scores.quality * W_QUALITY +
+    scores.standard * W_STANDARD +
+    scores.collaboration * W_COLLABORATION +
+    scores.bonus * W_BONUS
   );
 }

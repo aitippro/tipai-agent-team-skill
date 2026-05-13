@@ -18,7 +18,7 @@ import {
   FaultRecordInput,
 } from "../src/fault-tolerance";
 
-import { PersonaCard, ProjectArchive, FaultRecord, StructuredArchive, StageTaskCard } from "../src/schemas";
+import { PersonaCard, ProjectArchive, FaultRecord, StageTaskCard } from "../src/schemas";
 import { ContextSnapshot } from "../src/context-control";
 
 let pass = 0;

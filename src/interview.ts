@@ -270,7 +270,7 @@ export function generate_summary(answers: Record<string, string[]>, recommended_
 
   const feature_list = features.split(/[,，、\n]/).filter((f) => f.trim().length > 0);
   const complexity_result = detect_complexity(feature_list);
-  const _most_complex = get_most_complex(complexity_result);
+  get_most_complex(complexity_result);
 
   // 预估角色数: 每组1组长+至少2成员
   const estimated_roles = 1 + layers.length * 3; // 主Agent + 每组3人

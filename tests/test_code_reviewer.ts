@@ -7,12 +7,15 @@ import {
   detect_fake_implementation,
   count_effective_statements, has_todo_without_implementation,
   detect_empty_implementation,
+  detect_unfilled_constants,
   detect_dead_code, detect_no_side_effect_writes,
   detect_copy_paste_residue, detect_unused_imports,
+  detect_over_wrapping,
   detect_worthless_code,
   detect_hardcoded_return, detect_empty_catch,
   detect_comment_replacing_implementation, detect_requirement_code_mismatch,
   detect_pass_through, detect_fake_validation,
+  detect_fake_computation,
   detect_cheating_code,
   grade_review, grade_description, should_reject,
   generate_review_report,
@@ -206,10 +209,10 @@ function handle(req: any) {
 
 // ===== T-0035: 无价值代码检测器 =====
 
-test("T-0035: detect_dead_code -> 检测到无实现导出", () => {
+test("T-0035: detect_dead_code -> 单函数片段无误报", () => {
   const code = "export function unusedHelper() {}";
   const issues = detect_dead_code(code);
-  return issues.length >= 0; // 导出的空函数会被检测
+  return issues.length === 0;
 });
 
 test("T-0035: detect_no_side_effect_writes -> 赋值后未使用", () => {
@@ -272,7 +275,7 @@ const temp = 123;
 export function getData() {}
 return 42;`;
   const issues = detect_worthless_code(code, []);
-  return issues.length >= 0;
+  return issues.length >= 1;
 });
 
 // ===== T-0036: 糊弄代码检测器 =====
@@ -366,10 +369,12 @@ function transform(data: any) {
 test("T-0036: detect_fake_validation -> 假参数校验", () => {
   const code = `
 function handle(input: any) {
-  if (!input) throw new Error("invalid");
+  if (!input) {
+    throw new Error("invalid");
+  }
 }`;
   const issues = detect_fake_validation(code);
-  return issues.some((i) => i.subtype === "假参数校验") || issues.length >= 0;
+  return issues.some((i) => i.subtype === "假参数校验");
 });
 
 test("T-0036: detect_cheating_code -> 综合检测", () => {
@@ -525,6 +530,50 @@ test("T-0038: 审查完整链路 -> 正常代码通过+问题代码打回", () =
 
   return pass_or_mild && rejected
     && !report2.summary.includes("未检测到问题");
+});
+
+// ===== 新增子类型测试 =====
+
+test("T-0034: detect_unfilled_constants -> 占位符常量", () => {
+  const code = `const API_KEY = "TODO";\nconst DB_HOST = "placeholder";`;
+  const issues = detect_unfilled_constants(code);
+  return issues.length === 2 && issues.every(i => i.subtype === "关键常量未填充");
+});
+
+test("T-0034: detect_unfilled_constants -> 正常常量无问题", () => {
+  const code = `const API_KEY = "sk-abc123";\nconst MAX_RETRY = 3;`;
+  const issues = detect_unfilled_constants(code);
+  return issues.length === 0;
+});
+
+test("T-0035: detect_over_wrapping -> 透传调用检测", () => {
+  const code = `function getUser(id, name) {\n  return fetchUser(id, name);\n}`;
+  const issues = detect_over_wrapping(code);
+  return issues.length === 1 && issues[0].subtype === "过度包装";
+});
+
+test("T-0035: detect_over_wrapping -> 有转换的函数无问题", () => {
+  const code = `function getUser(id) {\n  const result = fetchUser(id);\n  return transform(result);\n}`;
+  const issues = detect_over_wrapping(code);
+  return issues.length === 0;
+});
+
+test("T-0036: detect_fake_computation -> 随机数返回", () => {
+  const code = `function calcScore(data) {\n  return Math.random() * 100;\n}`;
+  const issues = detect_fake_computation(code);
+  return issues.length >= 1 && issues[0].subtype === "假随机/假计算";
+});
+
+test("T-0036: detect_fake_computation -> 赋值给结果变量", () => {
+  const code = `function process(input) {\n  const result = Math.random();\n  return result;\n}`;
+  const issues = detect_fake_computation(code);
+  return issues.length >= 1;
+});
+
+test("T-0036: detect_fake_computation -> 正常计算无问题", () => {
+  const code = `function calcScore(data) {\n  return data.items.reduce((sum, i) => sum + i.score, 0) / data.items.length;\n}`;
+  const issues = detect_fake_computation(code);
+  return issues.length === 0;
 });
 
 console.log(`\n=== 结果: ${pass} 通过, ${fail} 失败 ===`);

@@ -100,9 +100,14 @@ test("T-0019: 数据层 → 正确模块", () => {
     && data.modules.includes("查询优化");
 });
 
-test("T-0019: 每层共享同一技术栈", () => {
+test("T-0019: 每层按职能分配技术栈", () => {
   const layers = decompose_to_layers(ecom_summary);
-  return layers.every((l) => l.tech_stack === "Go + PostgreSQL + React");
+  const frontend = layers.find((l) => l.name === "前端层")!;
+  const backend = layers.find((l) => l.name === "后端层")!;
+  const data = layers.find((l) => l.name === "数据层")!;
+  return frontend.tech_stack === "React"
+    && backend.tech_stack === "Go"
+    && data.tech_stack === "PostgreSQL";
 });
 
 const cms_summary: InterviewSummary = {

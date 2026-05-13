@@ -7,7 +7,7 @@
  * T-0028: 组长生成成员卡权限
  */
 
-import { PersonaCard, LifecycleMode } from "./schemas";
+import { PersonaCard, LifecycleMode, MAX_MEMBERS_PER_GROUP } from "./schemas";
 import { InterviewSummary } from "./interview";
 import {
   LayerDefinition,
@@ -50,8 +50,8 @@ export function build_team_structure(
     const lead = generate_team_lead_card(layer);
     all_cards.push(lead);
 
-    // 每组成员上限 3 人
-    const member_modules = layer.modules.slice(0, 3);
+    // 每组成员上限 3 人，超过部分截断并警告
+    const member_modules = layer.modules.slice(0, MAX_MEMBERS_PER_GROUP);
     const members: PersonaCard[] = [];
 
     for (const module of member_modules) {
@@ -64,7 +64,7 @@ export function build_team_structure(
       group_name: layer.name,
       lead,
       members,
-      max_members: 3,
+      max_members: MAX_MEMBERS_PER_GROUP,
     });
   }
 
@@ -238,7 +238,7 @@ export function create_team_lead_generator(
   group_name: string,
   layer: LayerDefinition,
   current_members: number = 0,
-  max_members: number = 3
+  max_members: number = MAX_MEMBERS_PER_GROUP
 ): TeamLeadMemberGenerator {
   return {
     lead_name,
@@ -394,10 +394,11 @@ export function get_approved_members(generator: TeamLeadMemberGenerator): Person
 }
 
 /**
- * 检查是否已达成员上限
+ * 检查是否已达成员上限（含待处理草稿，与 lead_generate_member_draft 定义一致）
  */
 export function is_at_max_capacity(generator: TeamLeadMemberGenerator): boolean {
-  return generator.current_members >= generator.max_members;
+  const effective_count = generator.current_members + generator.drafts.filter((d) => d.status !== "rejected").length;
+  return effective_count >= generator.max_members;
 }
 
 /**

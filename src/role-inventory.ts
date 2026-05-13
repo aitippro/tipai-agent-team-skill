@@ -28,6 +28,15 @@ export function write_to_inventory(
   input: InventoryWriteInput,
   existing_inventory: RoleInventory
 ): RoleInventory {
+  // 去重检查: 同名条目已存在则走更新逻辑
+  const name = input.card.name;
+  const existing_idx = existing_inventory.entries.findIndex(
+    (e) => e.persona_card.original.name === name
+  );
+  if (existing_idx >= 0) {
+    return update_inventory(input, existing_inventory);
+  }
+
   const frozen_card: FrozenPersonaCard = {
     original: { ...input.card },
     frozen_at: new Date().toISOString(),
@@ -242,7 +251,7 @@ export function update_inventory(
   const merged_evolution: SkillEvolution = existing
     ? {
         start: existing.skill_evolution.start || input.skill_evolution.start,
-        mid: existing.skill_evolution.end || input.skill_evolution.mid,
+        mid: existing.skill_evolution.end || existing.skill_evolution.mid,
         end: input.skill_evolution.end,
       }
     : input.skill_evolution;

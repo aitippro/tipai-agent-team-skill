@@ -3,7 +3,7 @@
  */
 import {
   StructuredArchive, WorkRecord, SkillEvolution,
-  SatisfactionRecord, SatisfactionScore, ClientModification,
+  SatisfactionRecord, SatisfactionScore,
   ConflictRecord, ConflictSeverity, ConflictType,
   FaultRecord, FaultLevel,
   ProjectArchive,

@@ -18,6 +18,8 @@ export type LifecycleMode = "permanent" | "project_destroy" | "follow_project";
 export type PermissionMode = "bypassPermissions" | "default";
 export type AgentRole = "lead" | "team_lead" | "member";
 
+export const MAX_MEMBERS_PER_GROUP = 3;
+
 export interface InputSource {
   from: string;
   format: string;

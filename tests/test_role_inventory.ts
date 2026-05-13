@@ -12,7 +12,7 @@ import {
   delete_from_inventory, confirm_deletion,
 } from "../src/role-inventory";
 
-import { PersonaCard, RoleInventory, RoleInventoryEntry, SkillEvolution } from "../src/schemas";
+import { PersonaCard, RoleInventory, SkillEvolution } from "../src/schemas";
 
 let pass = 0;
 let fail = 0;

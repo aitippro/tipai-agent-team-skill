@@ -11,9 +11,9 @@
  */
 
 import {
-  ConflictRecord,
+  ConflictRecord, PersonaCard,
 } from "./schemas";
-import { PersonaCard } from "./schemas";
+import { normalize_code } from "./code-reviewer";
 
 // ============ T-0039: 接口冲突检测器 ============
 
@@ -356,17 +356,8 @@ export function detect_logic_conflict(
  * 生成实现的指纹
  */
 export function generate_implementation_fingerprint(code: string): string {
-  // 基于代码结构生成粗略指纹
-  const normalized = code
-    .replace(/\/\/.*$/gm, "")
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/\s+/g, " ")
-    .replace(/['"`]/g, "'")
-    .replace(/\b[a-zA-Z_]\w*\b/g, "_ID_")
-    .replace(/\b\d+\b/g, "_NUM_")
-    .trim();
+  const normalized = normalize_code(code);
 
-  // 简单哈希
   let hash = 0;
   for (let i = 0; i < normalized.length; i++) {
     const char = normalized.charCodeAt(i);
@@ -624,7 +615,7 @@ export function apply_arbitration_result(
   });
 
   const party_marks = updated_cards
-    .filter((c) => party_cards.includes(c))
+    .filter((c) => conflict.parties.some((p) => c.name.includes(p) || p.includes(c.name) || c.role.includes(p)))
     .map((c) => ({ name: c.name, mark: decision.reason }));
 
   // 3. 写入冲突记录 (带解决信息)
@@ -653,8 +644,8 @@ export function apply_arbitration_result(
 export const DEFAULT_CONVENTIONS: ConventionRule[] = [
   { id: "C001", category: "响应格式", rule: "统一使用 {code, data, message} 响应结构", required_pattern: "code", forbidden_pattern: "status_code" },
   { id: "C002", category: "错误处理", rule: "错误必须通过统一错误码返回，不可直接 panic/process.exit", forbidden_pattern: "process.exit" },
-  { id: "C003", category: "命名规范", rule: "API 路由使用 camelCase 或 kebab-case", required_pattern: "" },
-  { id: "C004", category: "数据库", rule: "表名使用 snake_case 复数形式", required_pattern: "" },
+  { id: "C003", category: "命名规范", rule: "API 路由使用 camelCase 或 kebab-case", forbidden_pattern: "/_" },
+  { id: "C004", category: "数据库", rule: "表名使用 snake_case 复数形式", forbidden_pattern: "TableName" },
   { id: "C005", category: "日志", rule: "使用结构化日志，禁止 console.log 在生产代码中", forbidden_pattern: "console.log" },
   { id: "C006", category: "鉴权", rule: "所有 API 端点必须经过鉴权中间件", required_pattern: "auth" },
   { id: "C007", category: "版本", rule: "API URL 必须包含版本前缀 /api/v{N}/", required_pattern: "/api/v" },
