@@ -5,7 +5,7 @@
 | 层级 | 总任务 | 已完成 | 已验证 | 进度 |
 |---|---|---|---|---|
 | L0: Skill容器 | 3 | 3 | 3 | 100% |
-| L1: 数据结构 | 9 | 3 | 3 | 33% |
+| L1: 数据结构 | 9 | 9 | 9 | 100% |
 | L2: 需求采访 | 6 | 0 | 0 | 0% |
 | L3: 人物卡生成 | 6 | 0 | 0 | 0% |
 | L4: 团队组装 | 4 | 0 | 0 | 0% |
@@ -19,7 +19,7 @@
 | L12: 容错机制 | 5 | 0 | 0 | 0% |
 | L13: 项目档案 | 3 | 0 | 0 | 0% |
 | L14: 集成验证 | 6 | 0 | 0 | 0% |
-| **合计** | **77** | **6** | **6** | **7%** |
+| **合计** | **77** | **12** | **12** | **15%** |
 
 ---
 
@@ -60,43 +60,33 @@
 - 符合度: ✅ 无偏离
 
 ### T-0007: StructuredArchive Schema
-- [ ] 完成
-- [ ] 验证
-- 成员档案: 基础信息 + 工作履历[] + 技能演进 + 批注[]
-- 工作履历条目: task_id, time_range, goal, decision_chain, outputs[], pitfalls[], reusable_snippets[]
+- [x] 完成 — 2026-05-13，实现文件: `src/schemas.ts`，自测: 通过
+- [x] 验证 — 2026-05-13，QA: 2用例全通过，验证WorkRecord/SkillEvolution/Annotation结构完整
 - 符合度: ✅ 无偏离
 
 ### T-0008: SatisfactionRecord Schema
-- [ ] 完成
-- [ ] 验证
-- 维度分数: quality, standard, collaboration, bonus
-- 客户修改记录: original_score, modified_score, client_reason
-- 偏好信号: dimension, weight_adjustment, evidence[]
+- [x] 完成 — 2026-05-13，实现文件: `src/schemas.ts`，自测: 通过
+- [x] 验证 — 2026-05-13，QA: 2用例全通过，验证评分/客户修改/偏好信号结构完整
 - 符合度: ✅ 无偏离
 
 ### T-0009: ConflictRecord Schema
-- [ ] 完成
-- [ ] 验证
-- conflict_id, type(interface/data/convention/logic), parties[], severity, detected_by, resolution_path, result, convention_update
+- [x] 完成 — 2026-05-13，实现文件: `src/schemas.ts`，自测: 通过
+- [x] 验证 — 2026-05-13，QA: 2用例全通过，验证四种冲突类型+阻塞/延迟分级
 - 符合度: ✅ 无偏离
 
 ### T-0010: FaultRecord Schema
-- [ ] 完成
-- [ ] 验证
-- fault_id, role, fault_count, latest_fault, fault_pattern, suggestion
+- [x] 完成 — 2026-05-13，实现文件: `src/schemas.ts`，自测: 通过
+- [x] 验证 — 2026-05-13，QA: 2用例全通过，验证四级故障分类+故障次数+模式标记
 - 符合度: ✅ 无偏离
 
 ### T-0011: ProjectArchive Schema
-- [ ] 完成
-- [ ] 验证
-- 整合所有子 Schema 的项目级档案结构
+- [x] 完成 — 2026-05-13，实现文件: `src/schemas.ts`，自测: 通过
+- [x] 验证 — 2026-05-13，QA: 1用例全通过，验证项目档案整合所有子Schema
 - 符合度: ✅ 无偏离
 
 ### T-0012: RoleInventory Schema
-- [ ] 完成
-- [ ] 验证
-- 库存条目: persona_card(frozen), skill_evolution, history_scores[], suitable_scenarios[], unsuitable_scenarios[]
-- 库存索引: 按 tech_stack, score, scenario 的快速查找结构
+- [x] 完成 — 2026-05-13，实现文件: `src/schemas.ts`，自测: 通过
+- [x] 验证 — 2026-05-13，QA: 3用例全通过，验证库存条目+索引+active/dormant状态
 - 符合度: ✅ 无偏离
 
 ---
