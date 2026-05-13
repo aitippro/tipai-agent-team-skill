@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+
+# Claude Code artifacts (forbidden in public repos)
+CLAUDE.md
+.claude/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build
+dist/
+*.js.map
