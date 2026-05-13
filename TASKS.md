@@ -10,7 +10,7 @@
 | L3: 人物卡生成 | 6 | 6 | 6 | 100% |
 | L4: 团队组装 | 4 | 4 | 4 | 100% |
 | L5: 任务下发 | 4 | 4 | 4 | 100% |
-| L6: 代码审查 | 6 | 0 | 0 | 0% |
+| L6: 代码审查 | 6 | 6 | 6 | 100% |
 | L7: 冲突仲裁 | 7 | 0 | 0 | 0% |
 | L8: 上下文控制 | 5 | 0 | 0 | 0% |
 | L9: 满意度系统 | 4 | 0 | 0 | 0% |
@@ -19,7 +19,7 @@
 | L12: 容错机制 | 5 | 0 | 0 | 0% |
 | L13: 项目档案 | 3 | 0 | 0 | 0% |
 | L14: 集成验证 | 6 | 0 | 0 | 0% |
-| **合计** | **77** | **32** | **32** | **42%** |
+| **合计** | **77** | **38** | **38** | **49%** |
 
 ---
 
@@ -210,58 +210,33 @@
 ## Layer 6: 代码审查引擎
 
 ### T-0033: 假实现检测器
-- [ ] 完成
-- [ ] 验证
-- 5 个子类检测规则实现
-- 输入处理偏离: 对比需求字段数 vs 实际入参
-- 输出结构偏离: 对比下游契约 vs 实际返回值
-- 业务规则遗漏: 需求规则逐条映射到代码分支
-- 边界条件遗漏: 检测空值/零值/极限值/并发冲突处理
-- 错误路径假覆盖: 检测 catch-all 异常处理
+- [x] 完成 — 2026-05-13，实现文件: `src/code-reviewer.ts` (detect_input_deviation, detect_output_deviation, detect_business_rule_omission, detect_boundary_omission, detect_fake_error_handling, detect_fake_implementation)，自测: 通过
+- [x] 验证 — 2026-05-13，QA: 9用例全通过，覆盖: 输入缺失/输入匹配/输出缺失/业务规则遗漏/边界条件(空值/数组)/空catch/正常错误处理/综合检测
 - 符合度: ✅ 无偏离
 
 ### T-0034: 空实现检测器
-- [ ] 完成
-- [ ] 验证
-- 5 个子类检测规则实现
-- AST 层级有效语句计数 (排除注释/空return/TODO)
-- 有效语句 < 阈值 (≤1) → 标记
-- // TODO + 有效语句=0 → 重点标记
+- [x] 完成 — 2026-05-13，实现文件: `src/code-reviewer.ts` (count_effective_statements, has_todo_without_implementation, detect_empty_implementation)，自测: 通过
+- [x] 验证 — 2026-05-13，QA: 10用例全通过，覆盖: 正常代码>5/空函数=0/仅注释=0/仅return null=0/仅console.log=0/TODO+空实现标记/TODO+有实现/完全空实现/正常函数/TODO占位/仅有调试输出
 - 符合度: ✅ 无偏离
 
 ### T-0035: 无价值代码检测器
-- [ ] 完成
-- [ ] 验证
-- 6 个子类检测规则实现
-- 调用图分析 → 死代码
-- 变量活跃性分析 → 无副作用写入
-- 跨文件 AST 相似度比对 (>90%) → 复制粘贴残留
-- import 使用检查 → 未使用依赖
+- [x] 完成 — 2026-05-13，实现文件: `src/code-reviewer.ts` (detect_dead_code, detect_no_side_effect_writes, detect_copy_paste_residue, detect_unused_imports, detect_worthless_code)，自测: 通过
+- [x] 验证 — 2026-05-13，QA: 7用例全通过，覆盖: 死代码/无副作用写入/复制粘贴相似度>90%/不同代码无问题/未使用导入/综合检测/标识符归一化
 - 符合度: ✅ 无偏离
 
 ### T-0036: 糊弄代码检测器
-- [ ] 完成
-- [ ] 验证
-- 6 个子类检测规则实现
-- 硬编码返回检测: 函数返回常量 + 无视入参
-- 空 catch 块检测
-- 注释替代实现检测: 注释描述"应该做X" + 下一行跳过
-- 需求规则链 vs 代码执行路径对比
+- [x] 完成 — 2026-05-13，实现文件: `src/code-reviewer.ts` (detect_hardcoded_return, detect_empty_catch, detect_comment_replacing_implementation, detect_requirement_code_mismatch, detect_pass_through, detect_fake_validation, detect_cheating_code)，自测: 通过
+- [x] 验证 — 2026-05-13，QA: 12用例全通过，覆盖: 硬编码返回/正常入参使用/空catch块/仅注释catch/有处理catch/注释替代实现/注释+实现/需求代码不匹配/透传无处理/假参数校验/综合检测
 - 符合度: ✅ 无偏离
 
 ### T-0037: 审查结论定级
-- [ ] 完成
-- [ ] 验证
-- 无异常 → 通过
-- 仅无价值 <10% → 轻度
-- 有假实现或空实现 → 中度 → 打回
-- 有糊弄或假实现 >30% → 严重 → 打回+扣分
+- [x] 完成 — 2026-05-13，实现文件: `src/code-reviewer.ts` (grade_review, grade_description, should_reject)，自测: 通过
+- [x] 验证 — 2026-05-13，QA: 9用例全通过，覆盖: 无问题=pass/仅无价值=mild/假实现=moderate/空实现=moderate/糊弄=severe/密度>30%=severe/描述/打回判断
 - 符合度: ✅ 无偏离
 
 ### T-0038: 审查报告生成
-- [ ] 完成
-- [ ] 验证
-- 组长输出审查报告: 成员名/任务ID/四类异常标记/结论等级/具体行号
+- [x] 完成 — 2026-05-13，实现文件: `src/code-reviewer.ts` (generate_review_report, build_summary)，自测: 通过
+- [x] 验证 — 2026-05-13，QA: 4用例全通过，覆盖: 正常代码pass/问题代码检测/报告含行号+摘要/完整链路(正常通过+问题打回)
 - 符合度: ✅ 无偏离
 
 ---
