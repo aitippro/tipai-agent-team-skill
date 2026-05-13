@@ -16,10 +16,10 @@
 | L9: 满意度系统 | 4 | 4 | 4 | 100% |
 | L10: 生命周期 | 3 | 3 | 3 | 100% |
 | L11: 角色库存 | 6 | 6 | 6 | 100% |
-| L12: 容错机制 | 5 | 0 | 0 | 0% |
+| L12: 容错机制 | 5 | 5 | 5 | 100% |
 | L13: 项目档案 | 3 | 0 | 0 | 0% |
 | L14: 集成验证 | 6 | 0 | 0 | 0% |
-| **合计** | **77** | **63** | **63** | **82%** |
+| **合计** | **77** | **68** | **68** | **88%** |
 
 ---
 
@@ -389,44 +389,28 @@
 ## Layer 12: 容错机制
 
 ### T-0064: 故障分类器
-- [ ] 完成
-- [ ] 验证
-- 4 级故障: 自愈/需介入/需替换/需暂停
-- 故障分类规则引擎
+- [x] 完成 — 2026-05-13，实现文件: `src/fault-tolerance.ts` (classify_fault, FaultEvent)，自测: 通过
+- [x] 验证 — 2026-05-13，QA: 7用例全通过，覆盖: 单次→self_heal/2次成员→组长介入/2次组长→主Agent介入/3次→need_replace/死锁→need_pause/协商超时→need_intervention/死锁优先于连续次数
 - 符合度: ✅ 无偏离
 
 ### T-0065: 成员级别故障处理
-- [ ] 完成
-- [ ] 验证
-- 单次打回 → 组长给修改意见 + 重做时限
-- 连续2次 → 升级主Agent + 附带审查记录
-- 连续3次 → 主Agent判定替换 (库存检索 → 无则重新生成)
-- 旧卡标记失败原因入库
+- [x] 完成 — 2026-05-13，实现文件: `src/fault-tolerance.ts` (handle_single_reject, escalate_to_lead_agent, decide_member_replacement, mark_failed_card)，自测: 通过
+- [x] 验证 — 2026-05-13，QA: 6用例全通过，覆盖: 单次打回+时限+建议/累计次数/升级warned→escalated/不足3次不替换/无库存→regenerate/mark_failed_card标记lifecycle+原因
 - 符合度: ✅ 无偏离
 
 ### T-0066: 组长级别故障处理
-- [ ] 完成
-- [ ] 验证
-- 审核漏判 → 主Agent抽查发现 → 警告 + 记录
-- 连续漏判 → 替换组长
-- 协商僵持超时 → 主Agent直接仲裁
+- [x] 完成 — 2026-05-13，实现文件: `src/fault-tolerance.ts` (warn_lead_audit_miss, decide_lead_replacement, forced_arbitration_for_timeout)，自测: 通过
+- [x] 验证 — 2026-05-13，QA: 6用例全通过，覆盖: 警告+记录/2次warned/达阈值替换/未达阈值不替换/自定义阈值/强制仲裁含冲突ID
 - 符合度: ✅ 无偏离
 
 ### T-0067: 自动恢复
-- [ ] 完成
-- [ ] 验证
-- 成员替换 → 继承已完成任务上下文，不重做已验收
-- 组长替换 → 继承组内档案 + 当前阶段卡
-- 上下文丢失 → 从快照恢复
-- 死锁检测 → 强制定序
-- 产出冲突 → 败方废弃冲突部分，从仲裁点继续
+- [x] 完成 — 2026-05-13，实现文件: `src/fault-tolerance.ts` (recover_member_context, recover_lead_context, recover_from_snapshot, detect_deadlock, resolve_output_conflict)，自测: 通过
+- [x] 验证 — 2026-05-13，QA: 9用例全通过，覆盖: 成员继承任务+不重做/空任务/组长继承档案+阶段卡/快照恢复成功+失败/死锁检测+环识别/无死锁/字典序强制定序/败方废弃冲突部分
 - 符合度: ✅ 无偏离
 
 ### T-0068: 故障记录
-- [ ] 完成
-- [ ] 验证
-- 故障档案: 角色/次数/最近故障/故障模式/建议
-- 写入项目档案
+- [x] 完成 — 2026-05-13，实现文件: `src/fault-tolerance.ts` (create_fault_record, write_fault_to_archive, get_role_fault_history, check_replacement_threshold)，自测: 通过
+- [x] 验证 — 2026-05-13，QA: 6用例全通过，覆盖: 创建fault_id+fault_count=1/fault_count累计/write_fault_to_archive/get_role_fault_history过滤/达阈值/未达阈值
 - 符合度: ✅ 无偏离
 
 ---
