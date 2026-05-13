@@ -17,9 +17,9 @@
 | L10: 生命周期 | 3 | 3 | 3 | 100% |
 | L11: 角色库存 | 6 | 6 | 6 | 100% |
 | L12: 容错机制 | 5 | 5 | 5 | 100% |
-| L13: 项目档案 | 3 | 0 | 0 | 0% |
+| L13: 项目档案 | 3 | 3 | 3 | 100% |
 | L14: 集成验证 | 6 | 0 | 0 | 0% |
-| **合计** | **77** | **68** | **68** | **88%** |
+| **合计** | **77** | **71** | **71** | **92%** |
 
 ---
 
@@ -418,24 +418,18 @@
 ## Layer 13: 项目档案
 
 ### T-0069: 项目档案生成器
-- [ ] 完成
-- [ ] 验证
-- 汇总: 客户需求/团队结构/阶段记录/冲突记录/故障记录/满意度总评/可复用产出/库存变更
+- [x] 完成 — 2026-05-13，实现文件: `src/project-archive.ts` (generate_project_archive, generate_archive_summary)，自测: 通过
+- [x] 验证 — 2026-05-13，QA: 5用例全通过，覆盖: 全字段汇总/satisfaction_summary group_avg+project_avg/多阶段平均/无满意度=0/摘要含关键信息
 - 符合度: ✅ 无偏离
 
 ### T-0070: 档案只读保护
-- [ ] 完成
-- [ ] 验证
-- 生成后禁止修改
-- 只允许追加备注
-- 可检索 (项目名/技术栈/日期/角色名)
+- [x] 完成 — 2026-05-13，实现文件: `src/project-archive.ts` (freeze_archive, append_note, attempt_modify_protected, search_archive, search_archives)，自测: 通过
+- [x] 验证 — 2026-05-13，QA: 7用例全通过，覆盖: freeze冻结/append_note追加/attempt_modify拒绝/search按项目名/角色名/日期范围/search_archives批量
 - 符合度: ✅ 无偏离
 
 ### T-0071: 档案删除
-- [ ] 完成
-- [ ] 验证
-- 仅客户主动要求可删除
-- 删除前二次确认
+- [x] 完成 — 2026-05-13，实现文件: `src/project-archive.ts` (request_delete_archive, confirm_delete_archive, restore_from_backup, is_backup_recoverable)，自测: 通过
+- [x] 验证 — 2026-05-13，QA: 7用例全通过，覆盖: 创建删除请求/未确认拒绝/客户确认后删除+备份/非客户拒绝/恢复备份/30天内可恢复/超30天不可恢复
 - 符合度: ✅ 无偏离
 
 ---
