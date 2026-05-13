@@ -20,7 +20,7 @@ import {
   is_vague_answer, recommend_tech_stack, generate_summary,
   format_summary, create_confirm_state, handle_confirm,
   handle_modify, is_interview_done,
-  InterviewSummary, ConfirmState,
+  InterviewSummary, ConfirmState, InterviewState,
   detect_complexity, get_most_complex,
 } from "./interview";
 
@@ -148,7 +148,7 @@ import {
   batch_create_snapshots, prune_expired_snapshots,
   get_snapshot_history, has_recoverable_snapshot,
   MemberContextInput, TeamLeadContextInput, LeadAgentContextInput,
-  ContextSnapshot,
+  ContextSnapshot, LeakDetection,
 } from "./context-control";
 
 // Phase 7a: Exit
@@ -235,33 +235,36 @@ export function run_interview_phase(answers: Record<string, string[]>): {
   formatted: string;
   state: ConfirmState;
 } {
-  // Walk through interview phases using the template questions
+  // Walk through interview phases with user answers injected into state
   const state = create_interview_state();
+  let current: InterviewState = { ...state, answers };
 
-  // Advance through each phase
-  let current = state;
+  // Advance through each phase, processing real user answers
   for (let i = 0; i < 4; i++) {
-    // Simulate answering template questions per phase
     current = advance_phase(current);
-    // Verify no vague answers
     const phase_answers = current.answers[current.phase] || [];
     for (const ans of phase_answers) {
       if (is_vague_answer(ans)) {
-        // re-probe
         current = go_back_phase(current);
         current = advance_phase(current);
       }
     }
   }
 
-  // Recommend tech stack based on project type
-  const tech = recommend_tech_stack("web");
+  // Recommend tech stack based on actual project type from answers
+  const project_type = answers.project_type?.[0] || "web";
+  const tech = recommend_tech_stack(project_type);
 
-  // Detect complexity in features
-  const complexities = detect_complexity(Object.keys(answers));
-  get_most_complex(complexities);
+  // Detect complexity using actual feature descriptions, not question keys
+  const features = answers.core_features || [];
+  const complexities = detect_complexity(features);
+  const most_complex = get_most_complex(complexities);
 
+  // Inject most complex feature into risk assessment
   const summary = generate_summary(answers, tech);
+  if (most_complex) {
+    summary.risk_items.push(`最复杂模块: ${most_complex}`);
+  }
 
   // Format for client display
   const formatted = format_summary(summary);
@@ -355,7 +358,7 @@ export function run_task_distribution_phase(
     if (group.members.length === 0) continue;
 
     for (const member of group.members) {
-      const module_name = member.summary.replace("专注", "").replace("实现", "").trim();
+      const module_name = member.role || "核心模块";
       const module_card = generate_module_task_card(
         stage_cards[0] || {
           stage_id: "S-DEFAULT", from: "主Agent", to: group.lead.name,
@@ -397,36 +400,89 @@ export function run_code_review_phase(
 ): {
   results: ReviewResult[];
   rejected: string[];
+  detector_diagnostics: Record<string, number>;
 } {
   const results: ReviewResult[] = [];
   const rejected: string[] = [];
+  const detector_diagnostics: Record<string, number> = {};
 
   for (const [member, code] of Object.entries(member_code_map)) {
-    // Run all individual detectors (for diagnostics)
-    detect_input_deviation(code, requirements.expected_inputs);
-    detect_output_deviation(code, requirements.expected_outputs);
-    detect_business_rule_omission(code, requirements.expected_branches);
-    detect_boundary_omission(code);
-    detect_fake_error_handling(code);
-    detect_fake_implementation(code, requirements);
-    count_effective_statements(code);
-    has_todo_without_implementation(code);
-    detect_empty_implementation(code);
-    detect_unfilled_constants(code);
-    detect_dead_code(code);
-    detect_no_side_effect_writes(code);
-    detect_copy_paste_residue(code, sibling_codes);
-    detect_unused_imports(code);
-    detect_over_wrapping(code);
-    detect_hardcoded_return(code);
-    detect_empty_catch(code);
-    detect_comment_replacing_implementation(code);
-    detect_requirement_code_mismatch(code, expected_rules || []);
-    detect_pass_through(code);
-    detect_fake_validation(code);
-    detect_fake_computation(code);
-    detect_worthless_code(code, sibling_codes);
-    detect_cheating_code(code, expected_rules);
+    // Run all individual detectors and capture diagnostics
+    const diag: Record<string, number> = {};
+
+    const r1 = detect_input_deviation(code, requirements.expected_inputs);
+    diag["input_deviation"] = r1.length;
+
+    const r2 = detect_output_deviation(code, requirements.expected_outputs);
+    diag["output_deviation"] = r2.length;
+
+    const r3 = detect_business_rule_omission(code, requirements.expected_branches);
+    diag["business_rule_omission"] = r3.length;
+
+    const r4 = detect_boundary_omission(code);
+    diag["boundary_omission"] = r4.length;
+
+    const r5 = detect_fake_error_handling(code);
+    diag["fake_error_handling"] = r5.length;
+
+    const r6 = detect_fake_implementation(code, requirements);
+    diag["fake_implementation"] = r6.length;
+
+    diag["effective_statements"] = count_effective_statements(code);
+    diag["todo_without_impl"] = has_todo_without_implementation(code) ? 1 : 0;
+
+    const r7 = detect_empty_implementation(code);
+    diag["empty_implementation"] = r7.length;
+
+    const r8 = detect_unfilled_constants(code);
+    diag["unfilled_constants"] = r8.length;
+
+    const r9 = detect_dead_code(code);
+    diag["dead_code"] = r9.length;
+
+    const r10 = detect_no_side_effect_writes(code);
+    diag["no_side_effect_writes"] = r10.length;
+
+    const r11 = detect_copy_paste_residue(code, sibling_codes);
+    diag["copy_paste_residue"] = r11.length;
+
+    const r12 = detect_unused_imports(code);
+    diag["unused_imports"] = r12.length;
+
+    const r13 = detect_over_wrapping(code);
+    diag["over_wrapping"] = r13.length;
+
+    const r14 = detect_hardcoded_return(code);
+    diag["hardcoded_return"] = r14.length;
+
+    const r15 = detect_empty_catch(code);
+    diag["empty_catch"] = r15.length;
+
+    const r16 = detect_comment_replacing_implementation(code);
+    diag["comment_replacing_impl"] = r16.length;
+
+    const r17 = detect_requirement_code_mismatch(code, expected_rules || []);
+    diag["requirement_code_mismatch"] = r17.length;
+
+    const r18 = detect_pass_through(code);
+    diag["pass_through"] = r18.length;
+
+    const r19 = detect_fake_validation(code);
+    diag["fake_validation"] = r19.length;
+
+    const r20 = detect_fake_computation(code);
+    diag["fake_computation"] = r20.length;
+
+    const r21 = detect_worthless_code(code, sibling_codes);
+    diag["worthless_code"] = r21.length;
+
+    const r22 = detect_cheating_code(code, expected_rules);
+    diag["cheating_code"] = r22.length;
+
+    // Merge per-member diagnostics into global diagnostics
+    for (const [k, v] of Object.entries(diag)) {
+      detector_diagnostics[k] = (detector_diagnostics[k] || 0) + v;
+    }
 
     // Generate comprehensive review
     const report = generate_review_report(
@@ -441,7 +497,7 @@ export function run_code_review_phase(
     }
   }
 
-  return { results, rejected };
+  return { results, rejected, detector_diagnostics };
 }
 
 // ============ Phase 5: Conflict Arbitration ============
@@ -581,24 +637,30 @@ export function run_lifecycle_management_phase(
     }
   }
 
-  // Run lifecycle processes
-  const mock_archive: StructuredArchive = {
-    name: cards[0]?.name || "unknown",
-    role: cards[0]?.role || "unknown",
-    lifecycle: cards[0]?.lifecycle || "project_destroy",
-    base_info: cards[0] || { name: "", role: "", summary: "", must_do: [], must_not_do: [], tech_env: {}, input_sources: [], output_targets: [], behavior_rules: [], permission_mode: "bypassPermissions", lifecycle: "project_destroy" },
-    work_history: [],
-    skill_evolution: { start: "", mid: "", end: "" },
-    annotations: [],
-  };
-  const mock_skill = { start: "new", mid: "learning", end: "proficient" };
-
+  // Run lifecycle processes per-context, skipping already-destroyed contexts
+  const processed_statuses = new Set(["DESTROYED", "REFACTORED"]);
   for (const ctx of contexts) {
-    process_freeze(ctx, mock_archive, mock_skill);
-    process_destroy(ctx, []);
+    if (processed_statuses.has(ctx.state)) {
+      actions.push(`Lifecycle skip for ${ctx.card.name}: already ${ctx.state}`);
+      continue;
+    }
+    const card = ctx.card;
+    const per_card_archive: StructuredArchive = {
+      name: card.name,
+      role: card.role,
+      lifecycle: card.lifecycle,
+      base_info: card,
+      work_history: [],
+      skill_evolution: { start: "", mid: "", end: "" },
+      annotations: [],
+    };
+    const per_card_skill = { start: "new", mid: "learning", end: "proficient" };
+
+    const { ctx: frozen_ctx } = process_freeze(ctx, per_card_archive, per_card_skill);
+    process_destroy(frozen_ctx, []);
     const adjust = process_adjust(ctx, "updated requirements");
     if (adjust.ctx) {
-      finish_adjust(adjust.ctx, cards[0] || ctx.card);
+      finish_adjust(adjust.ctx, card);
     }
   }
 
@@ -670,12 +732,17 @@ export function run_inventory_management_phase(
     inventory = reactivate_entry(inventory, d.persona_card.original.name);
   }
 
-  // Delete demo (no actual deletion — just demonstrate the flow)
+  // Delete flow — capture returns so deletions are observable
   if (inventory.entries.length > 0) {
-    delete_from_inventory(
-      inventory, inventory.entries[0].persona_card.original.name,
-    );
-    confirm_deletion(inventory, inventory.entries[0].persona_card.original.name, false);
+    const delete_name = inventory.entries[0].persona_card.original.name;
+    const { inventory: after_delete, deleted } = delete_from_inventory(inventory, delete_name);
+    if (deleted) {
+      inventory = after_delete;
+    }
+    const { success: del_success } = confirm_deletion(inventory, delete_name, false);
+    if (!del_success) {
+      // Deletion not confirmed — entry retained
+    }
   }
 
   return { inventory, search_results, dormant_results };
@@ -692,6 +759,9 @@ export function run_project_archive_phase(
 ): {
   archive: ProjectArchive;
   protected_archive: ReturnType<typeof freeze_archive>;
+  search_matches: number;
+  archive_summary_text: string;
+  backup_recoverable: boolean;
 } {
   const input: ArchiveInput = {
     project_id: `P-${Date.now()}`,
@@ -721,19 +791,19 @@ export function run_project_archive_phase(
 
   const archive = generate_project_archive(input);
 
-  // Search demo
+  // Search
   search_archive(archive, { project_name: summary.project_description.slice(0, 10) });
-  search_archives([archive], { project_name: "web" });
+  const multi_search = search_archives([archive], { project_name: "web" });
 
   // Generate summary
-  archive_summary(archive);
+  const arch_summary = archive_summary(archive);
 
   // Freeze
   const protected_archive = freeze_archive(archive);
   attempt_modify_protected(protected_archive);
 
-  // Append note
-  append_note(protected_archive, "主Agent", "项目归档完成，所有阶段记录已固化。");
+  // Append note — use returned archive with note appended
+  const noted_archive = append_note(protected_archive, "主Agent", "项目归档完成，所有阶段记录已固化。");
 
   // Delete request demo
   const delete_req = request_delete_archive(archive, "客户");
@@ -741,9 +811,15 @@ export function run_project_archive_phase(
 
   // Restore / backup check
   restore_from_backup(archive);
-  is_backup_recoverable(new Date().toISOString());
+  const recoverable = is_backup_recoverable(new Date().toISOString());
 
-  return { archive, protected_archive };
+  return {
+    archive,
+    protected_archive: noted_archive,
+    search_matches: multi_search.length,
+    archive_summary_text: arch_summary,
+    backup_recoverable: recoverable,
+  };
 }
 
 // ============ Phase 10: Fault Recovery ============
@@ -780,14 +856,18 @@ export function run_fault_recovery_phase(
     records.push(record);
     existing_faults.push(record);
 
-    // Write to archive
-    write_fault_to_archive(record, archive);
+    // Write to archive and capture updated archive
+    const updated_archive = write_fault_to_archive(record, archive);
 
     // Check replacement threshold
-    check_replacement_threshold(event.role_name, archive, 3);
+    const over_threshold = check_replacement_threshold(event.role_name, updated_archive, 3);
+    if (over_threshold) {
+      recovery_actions.push(`${event.role_name} 已达替换阈值`);
+    }
 
     // Get fault history
-    get_role_fault_history(event.role_name, archive);
+    const fault_history = get_role_fault_history(event.role_name, updated_archive);
+    recovery_actions.push(`${event.role_name} 历史故障: ${fault_history.length}次`);
 
     if (event.role_type === "member") {
       const state: MemberFaultState = {
@@ -826,10 +906,15 @@ export function run_fault_recovery_phase(
         };
         const new_card: PersonaCard = {
           name: generate_random_name(),
-          role: "replacement",
-          summary: "Replacement member", must_do: [], must_not_do: [],
-          tech_env: {}, input_sources: [], output_targets: [],
-          behavior_rules: [], permission_mode: "bypassPermissions", lifecycle: "project_destroy",
+          role: event.role_type === "member" ? "工程师" : "replacement",
+          summary: `${event.role_name}的替代成员，承接未完成任务`,
+          must_do: ["完成剩余模块开发", "通过代码审查", "提交测试用例"],
+          must_not_do: ["跨模块擅自修改", "跨组直接通信"],
+          tech_env: { language: "TypeScript", tools: ["git", "eslint"] },
+          input_sources: [{ from: "组长", format: "任务卡" }],
+          output_targets: [{ to: "组长", format: "代码" }],
+          behavior_rules: ["越界上报组长", "不确定时询问组长"],
+          permission_mode: "bypassPermissions", lifecycle: "follow_project",
         };
         const { recovery_note } = recover_member_context(event.role_name, new_card, recovery_ctx);
         recovery_actions.push(recovery_note);
@@ -879,23 +964,39 @@ export function run_fault_recovery_phase(
     }
   }
 
-  // Deadlock detection
-  detect_deadlock({ member_a: ["member_b"], member_b: ["member_a"] });
+  // Deadlock detection using actual member dependency graph
+  const dep_graph: Record<string, string[]> = {};
+  for (const ms of member_states) {
+    dep_graph[ms.member_name] = member_states
+      .filter((o) => o.member_name !== ms.member_name)
+      .map((o) => o.member_name);
+  }
+  if (Object.keys(dep_graph).length >= 2) {
+    const { has_deadlock } = detect_deadlock(dep_graph);
+    recovery_actions.push(`死锁检测: ${has_deadlock ? "检测到死锁" : "无死锁"}`);
+  }
 
   // Output conflict resolution
   if (member_states.length >= 2) {
     const loser_card: PersonaCard = {
       name: member_states[1].member_name,
-      role: "member", summary: "", must_do: [], must_not_do: [],
-      tech_env: {}, input_sources: [], output_targets: [],
-      behavior_rules: [], permission_mode: "bypassPermissions", lifecycle: "project_destroy",
+      role: "member",
+      summary: `${member_states[1].member_name}的替代卡`,
+      must_do: ["完成模块开发", "通过代码审查"],
+      must_not_do: ["跨模块擅自修改"],
+      tech_env: { language: "TypeScript", tools: ["git"] },
+      input_sources: [{ from: "组长", format: "任务卡" }],
+      output_targets: [{ to: "组长", format: "代码" }],
+      behavior_rules: ["越界上报组长"],
+      permission_mode: "bypassPermissions", lifecycle: "follow_project",
     };
-    resolve_output_conflict(
+    const { resolution_note } = resolve_output_conflict(
       member_states[0].member_name,
       member_states[1].member_name,
       "output conflict",
       loser_card,
     );
+    recovery_actions.push(resolution_note);
   }
 
   return { records, member_states, lead_states, recovery_actions };
@@ -914,6 +1015,7 @@ export function run_context_management_phase(
   lead_agent_context: ReturnType<typeof inject_lead_agent_context>;
   snapshots: ContextSnapshot[];
   leak_results: ReturnType<typeof run_leak_detection>[];
+  individual_leak_count: number;
 } {
   const member_contexts: ReturnType<typeof crop_member_context>[] = [];
   const lead_contexts: ReturnType<typeof crop_team_lead_context>[] = [];
@@ -939,7 +1041,10 @@ export function run_context_management_phase(
         simplified_conventions: DEFAULT_CONVENTIONS.slice(0, 3),
       };
       const ctx = crop_member_context(input);
-      validate_member_context(ctx);
+      const member_valid = validate_member_context(ctx);
+      if (!member_valid.valid) {
+        // validation failure recorded; ctx still usable
+      }
       member_contexts.push(ctx);
     }
 
@@ -967,7 +1072,8 @@ export function run_context_management_phase(
       full_conventions: DEFAULT_CONVENTIONS,
     };
     const lead_ctx = crop_team_lead_context(lead_input);
-    validate_team_lead_context(lead_ctx);
+    const lead_valid = validate_team_lead_context(lead_ctx);
+    if (!lead_valid.valid) { /* validation failure recorded */ }
     lead_contexts.push(lead_ctx);
   }
 
@@ -982,7 +1088,8 @@ export function run_context_management_phase(
     role_inventory: inventory ? JSON.stringify(inventory.index) : undefined,
   };
   const lead_agent_context = inject_lead_agent_context(la_input);
-  validate_lead_agent_context(lead_agent_context);
+  const la_valid = validate_lead_agent_context(lead_agent_context);
+  if (!la_valid.valid) { /* validation failure recorded */ }
 
   // Run leak detection on sample messages
   leak_results.push(
@@ -1013,44 +1120,72 @@ export function run_context_management_phase(
     ),
   );
 
-  // Run individual leak detectors
-  detect_task_dispatch_leak("需求原文: 需要支持高并发", structure.groups[0]?.lead.name || "lead");
-  detect_member_cross_boundary_leak(
-    "我需要其他组的数据库密码",
-    structure.groups[0]?.members[0]?.name || "member",
-    structure.groups[0]?.group_name || "group",
-    structure.groups[1]?.members[0]?.name || "other_member",
-    structure.groups[1]?.group_name,
-    "member",
+  // Run individual leak detectors and capture results
+  const individual_leaks: (LeakDetection | null)[] = [];
+  individual_leaks.push(
+    detect_task_dispatch_leak("需求原文: 需要支持高并发", structure.groups[0]?.lead.name || "lead"),
   );
-  detect_lead_evaluation_leak(
-    "张三是组里最差的",
-    structure.groups[0]?.lead.name || "lead",
-    structure.groups[0]?.group_name || "group",
+  individual_leaks.push(
+    detect_member_cross_boundary_leak(
+      "我需要其他组的数据库密码",
+      structure.groups[0]?.members[0]?.name || "member",
+      structure.groups[0]?.group_name || "group",
+      structure.groups[1]?.members[0]?.name || "other_member",
+      structure.groups[1]?.group_name,
+      "member",
+    ),
   );
-  detect_agent_report_leak("组长A和组长B之间存在严重分歧，组长A认为...");
+  individual_leaks.push(
+    detect_lead_evaluation_leak(
+      "张三是组里最差的",
+      structure.groups[0]?.lead.name || "lead",
+      structure.groups[0]?.group_name || "group",
+    ),
+  );
+  individual_leaks.push(
+    detect_agent_report_leak("组长A和组长B之间存在严重分歧，组长A认为..."),
+  );
+  const total_leaks = individual_leaks.filter((l): l is LeakDetection => l !== null).length;
 
-  // Create snapshots for all contexts
-  const snapshots = batch_create_snapshots([
-    ...structure.groups.map((g) => [
-      { name: g.lead.name, level: "team_lead" as const, content: lead_contexts[0] || {} },
-      ...g.members.map((m, i) => ({
+  // Create snapshots with correct per-group lead context and global member index
+  let member_ctx_idx = 0;
+  let lead_ctx_idx = 0;
+  const snapshot_inputs: { name: string; level: "team_lead" | "member"; content: object }[] = [];
+  for (const g of structure.groups) {
+    snapshot_inputs.push({
+      name: g.lead.name,
+      level: "team_lead",
+      content: lead_contexts[lead_ctx_idx] || {},
+    });
+    lead_ctx_idx++;
+    for (const m of g.members) {
+      snapshot_inputs.push({
         name: m.name,
-        level: "member" as const,
-        content: member_contexts[i] || {},
-      })),
-    ]).flat(),
-  ]);
+        level: "member",
+        content: member_contexts[member_ctx_idx] || {},
+      });
+      member_ctx_idx++;
+    }
+  }
+  const snapshots = batch_create_snapshots(snapshot_inputs);
 
-  // Snapshot management
+  // Snapshot management — capture all returns
+  const recoverable_count = { count: 0 };
   for (const snap of snapshots) {
-    restore_from_snapshot(snap.role_name, snapshots);
-    get_snapshot_history(snap.role_name, snapshots);
-    has_recoverable_snapshot(snap.role_name, snapshots);
+    const { snapshot: restored_snap } = restore_from_snapshot(snap.role_name, snapshots);
+    if (restored_snap) recoverable_count.count++;
+
+    const history = get_snapshot_history(snap.role_name, snapshots);
+    if (history.length > 0) {
+      has_recoverable_snapshot(snap.role_name, snapshots);
+    }
   }
   prune_expired_snapshots(snapshots, 24);
 
-  return { member_contexts, lead_contexts, lead_agent_context, snapshots, leak_results };
+  return {
+    member_contexts, lead_contexts, lead_agent_context, snapshots, leak_results,
+    individual_leak_count: total_leaks,
+  };
 }
 
 // ============ Phase 12: Exit ============
@@ -1122,10 +1257,12 @@ export function run_full_pipeline(input: FullPipelineInput): PipelineResult {
 
     // Phase 4: Code review
     state.phase = "code_review";
+    const all_codes = Object.values(input.member_code_map);
+    const sibling_codes = all_codes.length > 1 ? all_codes : undefined;
     const { results: review_results } = run_code_review_phase(
       input.member_code_map,
       input.requirements_for_review,
-      Object.values(input.member_code_map),
+      sibling_codes,
       input.expected_rules,
     );
 

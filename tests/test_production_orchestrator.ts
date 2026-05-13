@@ -228,7 +228,7 @@ test("Phase5: run_conflict_arbitration_phase → 检测接口冲突", () => {
     mock_interfaces, mock_operations, mock_data_schema,
     { "张思远": mock_code }, mock_implementations, mock_cards,
   );
-  return pipeline_results.results.length >= 0
+  return Array.isArray(pipeline_results.results)
     && typeof pipeline_results === "object";
 });
 
@@ -298,12 +298,8 @@ test("Phase7: run_lifecycle_management_phase → 低分触发lifecycle", () => {
   const { record: r1 } = run_satisfaction_scoring_phase("S-005", "后端组", low_inputs, mock_cards);
   const { record: r2 } = run_satisfaction_scoring_phase("S-006", "后端组", low_inputs, mock_cards);
   const { record: r3 } = run_satisfaction_scoring_phase("S-007", "后端组", low_inputs, mock_cards);
-  try {
-    const { triggered } = run_lifecycle_management_phase(mock_cards, [r1, r2, r3]);
-    return typeof triggered === "boolean";
-  } catch {
-    return true;
-  }
+  const { triggered } = run_lifecycle_management_phase(mock_cards, [r1, r2, r3]);
+  return typeof triggered === "boolean";
 });
 
 // ===== Phase 8: Inventory Management =====
@@ -369,12 +365,8 @@ test("Phase10: run_fault_recovery_phase → 3次连续失败触发处理", () =>
     consecutive_failures: 3,
     review_reports: [],
   }];
-  try {
-    const { recovery_actions } = run_fault_recovery_phase(events, archive, inventory);
-    return recovery_actions.length >= 1;
-  } catch {
-    return true;
-  }
+  const { recovery_actions } = run_fault_recovery_phase(events, archive, inventory);
+  return recovery_actions.length >= 1;
 });
 
 // ===== Phase 11: Context Management =====
