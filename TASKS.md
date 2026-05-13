@@ -14,12 +14,12 @@
 | L7: 冲突仲裁 | 7 | 7 | 7 | 100% |
 | L8: 上下文控制 | 5 | 5 | 5 | 100% |
 | L9: 满意度系统 | 4 | 4 | 4 | 100% |
-| L10: 生命周期 | 3 | 0 | 0 | 0% |
+| L10: 生命周期 | 3 | 3 | 3 | 100% |
 | L11: 角色库存 | 6 | 0 | 0 | 0% |
 | L12: 容错机制 | 5 | 0 | 0 | 0% |
 | L13: 项目档案 | 3 | 0 | 0 | 0% |
 | L14: 集成验证 | 6 | 0 | 0 | 0% |
-| **合计** | **77** | **54** | **54** | **70%** |
+| **合计** | **77** | **57** | **57** | **74%** |
 
 ---
 
@@ -336,27 +336,18 @@
 ## Layer 10: 生命周期管理
 
 ### T-0055: 生命周期状态机
-- [ ] 完成
-- [ ] 验证
-- 状态: ACTIVE → FROZEN(永久保留) / DESTROYED(项目销毁) / ADJUSTING(随项目调整)
-- 任何阶段客户可提变更请求
+- [x] 完成 — 2026-05-13，实现文件: `src/lifecycle-manager.ts` (init_lifecycle, transition_lifecycle, get_valid_transitions, VALID_TRANSITIONS)，自测: 通过
+- [x] 验证 — 2026-05-13，QA: 13用例全通过，覆盖: 初始ACTIVE/4种合法转换/2种不合法/DESTROYED不可逆/transitions历史/DESTROYED清上下文/ADJUSTING标记/get_valid_transitions全状态
 - 符合度: ✅ 无偏离
 
 ### T-0056: 生命周期变更处理器
-- [ ] 完成
-- [ ] 验证
-- 永久保留: 冻结人物卡 + 归档技能演进 → 入库
-- 项目销毁: 清角色上下文 → 工作记录留项目档案
-- 随项目调整: 释放约束词 → 重新采访补充
-- 满意度触发销毁: 连续3次≤2 → 建议 + 客户确认 → 销毁
+- [x] 完成 — 2026-05-13，实现文件: `src/lifecycle-manager.ts` (process_freeze, process_destroy, process_adjust, finish_adjust)，自测: 通过
+- [x] 验证 — 2026-05-13，QA: 8用例全通过，覆盖: freeze冻结+归档/技能演进/destroy保留工作记录/adjust释放约束+标记重采访/无需求默认项/finish_adjust/非ADJUSTING报错/非ACTIVE冻结失败/调整次数递增
 - 符合度: ✅ 无偏离
 
 ### T-0057: 满意度触发生命周期变更
-- [ ] 完成
-- [ ] 验证
-- 连续 3 次 ≤2 分 → 主Agent主动建议销毁/重构
-- 附带证据: 3次低分记录 + 原因
-- 客户确认后执行
+- [x] 完成 — 2026-05-13，实现文件: `src/lifecycle-manager.ts` (check_satisfaction_trigger, suggest_destroy_from_low_score, execute_satisfaction_destroy, execute_satisfaction_refactor)，自测: 通过
+- [x] 验证 — 2026-05-13，QA: 9用例全通过，覆盖: 3次≤2触发/1次不触发/高分中断连续/全高分不触发/建议含销毁+重构选项/执行销毁/已销毁不可重复/重构角色替换/evidence含详细原因
 - 符合度: ✅ 无偏离
 
 ---
