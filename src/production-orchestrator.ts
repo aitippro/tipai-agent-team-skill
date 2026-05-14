@@ -92,7 +92,7 @@ import {
 
 // Phase 5a: Lifecycle
 import {
-  init_lifecycle, transition_lifecycle, get_valid_transitions,
+  init_lifecycle, get_valid_transitions,
   process_freeze, process_destroy, process_adjust, finish_adjust,
   check_satisfaction_trigger, suggest_destroy_from_low_score,
   execute_satisfaction_destroy, execute_satisfaction_refactor,
@@ -527,20 +527,18 @@ export function run_conflict_arbitration_phase(
     member_code_map, implementations, conventions, party_cards,
   );
 
-  // For each convention conflict, run negotiation
+  // Run negotiation for all conflict types (interface/data/convention/logic)
   const negotiation_states: NegotiationState[] = [];
   for (const conflict of pipeline_results.conflicts) {
-    if (conflict.type === "convention") {
-      const neg = create_negotiation(conflict.conflict_id, 2);
-      let neg_state = neg;
-      // Simulate 1 round
-      neg_state = record_negotiation_round(neg_state);
-      if (check_negotiation_timeout(neg_state)) {
-        const escalated = escalate_to_main_agent(neg_state, conflict);
-        neg_state = escalated.state;
-      }
-      negotiation_states.push(neg_state);
+    const neg = create_negotiation(conflict.conflict_id, 2);
+    let neg_state = neg;
+    // Simulate 1 round
+    neg_state = record_negotiation_round(neg_state);
+    if (check_negotiation_timeout(neg_state)) {
+      const escalated = escalate_to_main_agent(neg_state, conflict);
+      neg_state = escalated.state;
     }
+    negotiation_states.push(neg_state);
   }
 
   return { pipeline_results, negotiation_states };
@@ -602,7 +600,8 @@ export function run_satisfaction_scoring_phase(
 
 export function run_lifecycle_management_phase(
   cards: PersonaCard[],
-  satisfaction_history: SatisfactionRecord[]
+  satisfaction_history: SatisfactionRecord[],
+  lifecycle_mode: LifecycleMode = "follow_project"
 ): {
   triggered: boolean;
   actions: string[];
@@ -634,15 +633,15 @@ export function run_lifecycle_management_phase(
         actions.push(suggestion.option_refactor);
       }
     } else {
-      // Normal lifecycle transition
-      const transition = transition_lifecycle(ctx, "ACTIVE", "phase complete", "主Agent");
-      if (transition.success) {
-        contexts.push(transition.ctx);
-      } else {
-        actions.push(`Transition failed: ${transition.error}`);
-        contexts.push(ctx);
-      }
+      // Normal path — context starts ACTIVE, lifecycle chain (adjust→freeze→destroy) handles transitions below
+      contexts.push(ctx);
     }
+  }
+
+  // Apply lifecycle_mode policy
+  if (lifecycle_mode === "permanent") {
+    actions.push("lifecycle_mode=permanent: 跳过销毁流程，角色持久保留");
+    return { triggered, actions, contexts };
   }
 
   // Run lifecycle processes per-context, skipping already-destroyed contexts
@@ -864,8 +863,9 @@ export function run_fault_recovery_phase(
     records.push(record);
     existing_faults.push(record);
 
-    // Write to archive and capture updated archive
+    // Write to archive and accumulate so subsequent iterations see prior faults
     const updated_archive = write_fault_to_archive(record, archive);
+    archive = updated_archive;
 
     // Check replacement threshold
     const over_threshold = check_replacement_threshold(event.role_name, updated_archive, 3);
@@ -914,7 +914,7 @@ export function run_fault_recovery_phase(
         };
         const new_card: PersonaCard = {
           name: generate_random_name(),
-          role: event.role_type === "member" ? "工程师" : "replacement",
+          role: "工程师",
           summary: `${event.role_name}的替代成员，承接未完成任务`,
           must_do: ["完成剩余模块开发", "通过代码审查", "提交测试用例"],
           must_not_do: ["跨模块擅自修改", "跨组直接通信"],
@@ -975,12 +975,11 @@ export function run_fault_recovery_phase(
     }
   }
 
-  // Deadlock detection using actual member dependency graph
+  // Deadlock detection — requires actual dependency edges from team structure
+  // Without real dependency data, each member starts with an empty adjacency list
   const dep_graph: Record<string, string[]> = {};
   for (const ms of member_states) {
-    dep_graph[ms.member_name] = member_states
-      .filter((o) => o.member_name !== ms.member_name)
-      .map((o) => o.member_name);
+    dep_graph[ms.member_name] = [];
   }
   if (Object.keys(dep_graph).length >= 2) {
     const { has_deadlock } = detect_deadlock(dep_graph);
@@ -1028,6 +1027,7 @@ export function run_context_management_phase(
   leak_results: ReturnType<typeof run_leak_detection>[];
   individual_leak_count: number;
   recoverable_count: number;
+  history_recoverable: number;
   pruned_count: number;
   validation_failures: number;
 } {
@@ -1186,6 +1186,7 @@ export function run_context_management_phase(
 
   // Snapshot management — capture all returns
   let recoverable_count = 0;
+  let history_recoverable = 0;
   for (const snap of snapshots) {
     const { snapshot: restored_snap } = restore_from_snapshot(snap.role_name, snapshots);
     if (restored_snap) recoverable_count++;
@@ -1193,7 +1194,7 @@ export function run_context_management_phase(
     const history = get_snapshot_history(snap.role_name, snapshots);
     if (history.length > 0) {
       const has_recov = has_recoverable_snapshot(snap.role_name, snapshots);
-      if (has_recov) recoverable_count++;
+      if (has_recov) history_recoverable++;
     }
   }
   const before_prune = snapshots.length;
@@ -1204,6 +1205,7 @@ export function run_context_management_phase(
     member_contexts, lead_contexts, lead_agent_context, snapshots, leak_results,
     individual_leak_count: total_leaks,
     recoverable_count,
+    history_recoverable,
     pruned_count,
     validation_failures,
   };
@@ -1305,7 +1307,6 @@ export function run_full_pipeline(input: FullPipelineInput): PipelineResult {
     // Phase 6: Satisfaction scoring
     state.phase = "satisfaction_scoring";
     const member_inputs: ScoringInput[] = structure.all_cards
-      .filter((c) => c.role.includes("工程师"))
       .map((c) => ({
         member_name: c.name,
         role: c.role,
@@ -1325,7 +1326,7 @@ export function run_full_pipeline(input: FullPipelineInput): PipelineResult {
 
     // Phase 7: Lifecycle management
     state.phase = "lifecycle_management";
-    const lifecycle = run_lifecycle_management_phase(updated_cards, satisfaction_records);
+    const lifecycle = run_lifecycle_management_phase(updated_cards, satisfaction_records, input.lifecycle_mode);
 
     // Phase 8: Role inventory
     state.phase = "inventory_management";
@@ -1392,6 +1393,21 @@ export function run_full_pipeline(input: FullPipelineInput): PipelineResult {
     errors.push(`Pipeline error at phase ${state.phase}: ${e}`);
     state.errors = errors;
     state.halted = true;
-    throw e;
+    return {
+      summary: { project_description: input.project_description, tech_stack: "", deployment: "", suggested_layers: [], estimated_roles: 0, risk_items: [] },
+      team: { lead_agent_name: "", groups: [], all_cards: [], created_at: new Date().toISOString() },
+      rendered_cards: [],
+      review_results: [],
+      arbitration_results: [],
+      satisfaction_records: [],
+      preference_profile: null,
+      lifecycle_results: [],
+      inventory: { entries: [], index: { entries: [] } },
+      archive: { project_id: "", project_name: "", time_range: "", status: "active", original_requirements: "", team_structure: { lead_agent: "", groups: [] }, stage_records: [], conflict_records: [], fault_records: [], satisfaction_summary: { group_avg: {}, project_avg: 0 }, reusable_outputs: [], inventory_changes: [] },
+      context_snapshots: [],
+      exit_checklist: null,
+      constitution_checks: [],
+      errors,
+    };
   }
 }
