@@ -102,7 +102,7 @@ npm test
 
 ## 测试覆盖
 
-18 个测试套件，605+ 用例，零失败。
+18 个测试套件，623 用例，零失败。
 
 ```bash
 # 运行全部测试
@@ -119,25 +119,24 @@ npx tsx tests/test_interview.ts
 
 | 套件 | 覆盖模块 | 用例数 |
 |------|----------|--------|
-| `test_layer1_schemas` | 核心类型定义 | ~20 |
-| `test_schemas` | Schema 校验 | ~30 |
-| `test_constitution` | 宪章检查引擎 | ~25 |
-| `test_interview` | 多轮采访 | ~35 |
-| `test_card_generator` | 人物卡生成 | ~30 |
-| `test_team_assembler` | 团队组建 | ~25 |
-| `test_validation` | 校验器 | ~20 |
-| `test_task_distributor` | 任务下发 | ~45 |
-| `test_code_reviewer` | 代码审查 | ~49 |
-| `test_conflict_arbitrator` | 冲突仲裁 | ~68 |
-| `test_satisfaction_system` | 满意度系统 | ~41 |
-| `test_lifecycle_manager` | 生命周期管理 | ~30 |
-| `test_role_inventory` | 角色库存 | ~33 |
-| `test_project_archive` | 项目档案 | ~19 |
-| `test_fault_tolerance` | 容错恢复 | ~34 |
-| `test_context_control` | 上下文控制 | ~50 |
-| `test_exit_handler` | 退出处理 | ~20 |
-| `test_production_orchestrator` | 生产编排器(全链路) | ~35 |
-| `test_integration` | 端到端集成 | ~9 |
+| `test_layer1_schemas` | 核心类型定义 | 13 |
+| `test_schemas` | Schema 校验 + 人物卡/任务卡验证 | 21 |
+| `test_constitution` | 宪章检查引擎 | 23 |
+| `test_interview` | 多轮采访 | 25 |
+| `test_card_generator` | 人物卡生成 | 50 |
+| `test_team_assembler` | 团队组建 | 45 |
+| `test_task_distributor` | 任务下发 | 46 |
+| `test_code_reviewer` | 代码审查 | 57 |
+| `test_conflict_arbitrator` | 冲突仲裁 | 69 |
+| `test_satisfaction_system` | 满意度系统 | 42 |
+| `test_lifecycle_manager` | 生命周期管理 | 31 |
+| `test_role_inventory` | 角色库存 | 34 |
+| `test_project_archive` | 项目档案 | 20 |
+| `test_fault_tolerance` | 容错恢复 | 35 |
+| `test_context_control` | 上下文控制 | 51 |
+| `test_exit_handler` | 退出处理 | 8 |
+| `test_production_orchestrator` | 生产编排器(全链路) | 43 |
+| `test_integration` | 端到端集成 | 10 |
 
 ## 元规则（宪章）
 
