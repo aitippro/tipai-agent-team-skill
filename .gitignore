@@ -18,3 +18,7 @@ Thumbs.db
 # Build
 dist/
 *.js.map
+
+# Autonomous pipeline
+autonomous/logs/
+autonomous/.runner.lock
