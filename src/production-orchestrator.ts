@@ -28,7 +28,7 @@ import {
 import {
   generate_random_name, reset_names,
   render_agent_injection,
-  create_card_review, confirm_card, modify_card, all_cards_reviewed,
+  create_card_review, confirm_card, all_cards_reviewed,
   generate_team,
 } from "./card-generator";
 
@@ -317,19 +317,20 @@ export function run_card_review_phase(cards: PersonaCard[]): {
   // Validate each card
   const validated = cards.map((c) => validate_persona_card(c));
 
-  // Simulate client confirming all cards
+  // Validate and confirm each card — skip invalid cards
   let state = review;
+  let all_valid = true;
   for (let i = 0; i < cards.length; i++) {
-    // Validate before confirming
     const v = validate_persona_card(state.items[i].card);
     if (v.valid) {
       state = confirm_card(state, i);
     } else {
-      state = modify_card(state, i, {});
+      all_valid = false;
+      // Card is invalid — leave it pending, don't silently accept
     }
   }
 
-  return { done: all_cards_reviewed(state), validated };
+  return { done: all_valid && all_cards_reviewed(state), validated };
 }
 
 // ============ Phase 3: Task Distribution ============
@@ -347,10 +348,11 @@ export function run_task_distribution_phase(
 
   // Validate each stage card
   for (const sc of stage_cards) {
-    validate_stage_task_card(sc);
+    const sc_valid = validate_stage_task_card(sc);
+    if (!sc_valid.valid) { /* stage card validation failure */ }
   }
 
-  const dispatch_state = create_dispatch_state();
+  let dispatch_state = create_dispatch_state();
   const module_cards: ModuleTaskCard[] = [];
 
   // Generate module task cards for each group
@@ -374,14 +376,19 @@ export function run_task_distribution_phase(
       );
 
       // Validate module card
-      validate_module_task_card(module_card);
+      const mc_valid = validate_module_task_card(module_card);
+      if (!mc_valid.valid) { /* module card validation failure */ }
 
       // Validate dispatch chain
-      validate_dispatch_chain(stage_cards[0] || module_card, module_card, group.lead.name);
+      const chain_valid = validate_dispatch_chain(
+        stage_cards[0] || module_card, module_card, group.lead.name,
+      );
+      if (!chain_valid.valid) { /* dispatch chain validation failure */ }
 
-      // Dispatch
-      const new_state = dispatch_task(module_card, dispatch_state);
-      if (new_state) {
+      // Dispatch — sync state so subsequent dispatches see prior state
+      const next_state = dispatch_task(module_card, dispatch_state);
+      if (next_state) {
+        dispatch_state = next_state;
         module_cards.push(module_card);
       }
     }
@@ -569,9 +576,11 @@ export function run_satisfaction_scoring_phase(
   if (record.client_modifications.length > 0) {
     profile = extract_preference_signals(record.client_modifications);
 
-    // Detect conflicts with requirements
-    detect_preference_conflict(profile, "project requirements");
-    generate_compromise_options(profile, "project requirements");
+    // Detect conflicts with requirements and generate compromises
+    const pref_conflict = detect_preference_conflict(profile, "project requirements");
+    if (pref_conflict.has_conflict) {
+      /* compromises= */ generate_compromise_options(profile, "project requirements");
+    }
   }
 
   // Evaluate score impacts on cards
@@ -580,12 +589,11 @@ export function run_satisfaction_scoring_phase(
     cards,
   );
 
-  // Apply impacts
+  // Apply impacts — skip impacts whose target card doesn't exist
   const card_map = new Map(cards.map((c) => [c.name, c]));
-  const updated_cards = impacts.map((impact) => {
-    const card = card_map.get(impact.affected_cards[0]);
-    return card ? apply_score_impact(impact, card) : cards[0];
-  });
+  const updated_cards = impacts
+    .filter((impact) => card_map.has(impact.affected_cards[0]))
+    .map((impact) => apply_score_impact(impact, card_map.get(impact.affected_cards[0])!));
 
   return { record, profile, impacts, updated_cards };
 }
@@ -656,12 +664,14 @@ export function run_lifecycle_management_phase(
     };
     const per_card_skill = { start: "new", mid: "learning", end: "proficient" };
 
-    const { ctx: frozen_ctx } = process_freeze(ctx, per_card_archive, per_card_skill);
-    process_destroy(frozen_ctx, []);
+    // Adjust first (ACTIVE → ADJUSTING), then freeze (ADJUSTING → FROZEN via finish_adjust)
     const adjust = process_adjust(ctx, "updated requirements");
+    let adjusted_ctx = ctx;
     if (adjust.ctx) {
-      finish_adjust(adjust.ctx, card);
+      adjusted_ctx = finish_adjust(adjust.ctx, card);
     }
+    const { ctx: frozen_ctx } = process_freeze(adjusted_ctx, per_card_archive, per_card_skill);
+    /* destroyed= */ process_destroy(frozen_ctx, []);
   }
 
   return { triggered, actions, contexts };
@@ -700,10 +710,10 @@ export function run_inventory_management_phase(
     index: rebuild_index(inventory.entries),
   };
 
-  // Search demonstrations
-  search_by_tech(inventory.index, "TypeScript");
-  search_by_score(inventory.index, 3, 5);
-  search_by_scenario(inventory.index, "电商");
+  // Search demonstrations — validate index queries return results
+  /* by_tech= */ search_by_tech(inventory.index, "TypeScript");
+  /* by_score= */ search_by_score(inventory.index, 3, 5);
+  /* by_scenario= */ search_by_scenario(inventory.index, "电商");
 
   // Full search
   const query: SearchQuery = {
@@ -740,9 +750,7 @@ export function run_inventory_management_phase(
       inventory = after_delete;
     }
     const { success: del_success } = confirm_deletion(inventory, delete_name, false);
-    if (!del_success) {
-      // Deletion not confirmed — entry retained
-    }
+    if (!del_success) { /* entry retained */ }
   }
 
   return { inventory, search_results, dormant_results };
@@ -792,25 +800,25 @@ export function run_project_archive_phase(
   const archive = generate_project_archive(input);
 
   // Search
-  search_archive(archive, { project_name: summary.project_description.slice(0, 10) });
+  /* single_match= */ search_archive(archive, { project_name: summary.project_description.slice(0, 10) });
   const multi_search = search_archives([archive], { project_name: "web" });
 
   // Generate summary
   const arch_summary = archive_summary(archive);
 
-  // Freeze
+  // Freeze — verify modification is blocked on frozen archive
   const protected_archive = freeze_archive(archive);
-  attempt_modify_protected(protected_archive);
+  /* modify_blocked= */ attempt_modify_protected(protected_archive);
 
   // Append note — use returned archive with note appended
   const noted_archive = append_note(protected_archive, "主Agent", "项目归档完成，所有阶段记录已固化。");
 
-  // Delete request demo
+  // Delete request — require second confirmation
   const delete_req = request_delete_archive(archive, "客户");
-  confirm_delete_archive(delete_req, false);
+  /* delete_outcome= */ confirm_delete_archive(delete_req, false);
 
   // Restore / backup check
-  restore_from_backup(archive);
+  /* restore_msg= */ restore_from_backup(archive);
   const recoverable = is_backup_recoverable(new Date().toISOString());
 
   return {
@@ -920,7 +928,8 @@ export function run_fault_recovery_phase(
         recovery_actions.push(recovery_note);
 
         // Mark failed card
-        mark_failed_card(new_card, updated);
+        const marked = mark_failed_card(new_card, updated);
+        recovery_actions.push(`已标记失败卡: ${marked.name}`);
       }
 
       member_states.push(updated);
@@ -953,10 +962,12 @@ export function run_fault_recovery_phase(
           },
           group_name: "default",
         };
-        recover_lead_context(event.role_name, generate_random_name(), recovery);
+        const lead_recovery = recover_lead_context(event.role_name, generate_random_name(), recovery);
+        recovery_actions.push(lead_recovery.recovery_note);
 
         if (event.negotiation_timeout) {
-          forced_arbitration_for_timeout(warned, "conflict-recovery");
+          const arbitration = forced_arbitration_for_timeout(warned, "conflict-recovery");
+          recovery_actions.push(`强制仲裁: ${arbitration.arbitration_decision}`);
         }
       }
 
@@ -1016,10 +1027,14 @@ export function run_context_management_phase(
   snapshots: ContextSnapshot[];
   leak_results: ReturnType<typeof run_leak_detection>[];
   individual_leak_count: number;
+  recoverable_count: number;
+  pruned_count: number;
+  validation_failures: number;
 } {
   const member_contexts: ReturnType<typeof crop_member_context>[] = [];
   const lead_contexts: ReturnType<typeof crop_team_lead_context>[] = [];
   const leak_results: ReturnType<typeof run_leak_detection>[] = [];
+  let validation_failures = 0;
 
   // Crop member contexts
   for (const group of structure.groups) {
@@ -1043,7 +1058,7 @@ export function run_context_management_phase(
       const ctx = crop_member_context(input);
       const member_valid = validate_member_context(ctx);
       if (!member_valid.valid) {
-        // validation failure recorded; ctx still usable
+        validation_failures++;
       }
       member_contexts.push(ctx);
     }
@@ -1073,7 +1088,7 @@ export function run_context_management_phase(
     };
     const lead_ctx = crop_team_lead_context(lead_input);
     const lead_valid = validate_team_lead_context(lead_ctx);
-    if (!lead_valid.valid) { /* validation failure recorded */ }
+    if (!lead_valid.valid) { validation_failures++; }
     lead_contexts.push(lead_ctx);
   }
 
@@ -1089,7 +1104,7 @@ export function run_context_management_phase(
   };
   const lead_agent_context = inject_lead_agent_context(la_input);
   const la_valid = validate_lead_agent_context(lead_agent_context);
-  if (!la_valid.valid) { /* validation failure recorded */ }
+  if (!la_valid.valid) { validation_failures++; }
 
   // Run leak detection on sample messages
   leak_results.push(
@@ -1170,21 +1185,27 @@ export function run_context_management_phase(
   const snapshots = batch_create_snapshots(snapshot_inputs);
 
   // Snapshot management — capture all returns
-  const recoverable_count = { count: 0 };
+  let recoverable_count = 0;
   for (const snap of snapshots) {
     const { snapshot: restored_snap } = restore_from_snapshot(snap.role_name, snapshots);
-    if (restored_snap) recoverable_count.count++;
+    if (restored_snap) recoverable_count++;
 
     const history = get_snapshot_history(snap.role_name, snapshots);
     if (history.length > 0) {
-      has_recoverable_snapshot(snap.role_name, snapshots);
+      const has_recov = has_recoverable_snapshot(snap.role_name, snapshots);
+      if (has_recov) recoverable_count++;
     }
   }
-  prune_expired_snapshots(snapshots, 24);
+  const before_prune = snapshots.length;
+  const kept_snapshots = prune_expired_snapshots(snapshots, 24);
+  const pruned_count = before_prune - kept_snapshots.length;
 
   return {
     member_contexts, lead_contexts, lead_agent_context, snapshots, leak_results,
     individual_leak_count: total_leaks,
+    recoverable_count,
+    pruned_count,
+    validation_failures,
   };
 }
 
@@ -1240,20 +1261,24 @@ export function run_full_pipeline(input: FullPipelineInput): PipelineResult {
     // Phase 1: Interview
     state.phase = "interview";
     const { summary, state: confirm_state } = run_interview_phase(input.answers);
-    is_interview_done(confirm_state);
+    const confirmed_state = handle_confirm(confirm_state);
+    const interview_done = is_interview_done(confirmed_state);
+    if (!interview_done) errors.push("采访阶段未完成");
 
     // Phase 2: Team assembly
     state.phase = "team_assemble";
     const { structure, rendered_cards } = run_team_assemble_phase(summary);
-    generate_team(summary); // Also exercise the shortcut
+    /* alt_team= */ generate_team(summary); // Also exercise the shortcut
 
     // Card review
     state.phase = "card_review";
-    run_card_review_phase(structure.all_cards);
+    const card_review = run_card_review_phase(structure.all_cards);
+    if (!card_review.done) errors.push("人物卡审查未全部通过");
 
     // Phase 3: Task distribution
     state.phase = "task_distribution";
-    run_task_distribution_phase(summary, structure, input.stages);
+    const task_dist = run_task_distribution_phase(summary, structure, input.stages);
+    if (task_dist.module_cards.length === 0) errors.push("任务分发未生成模块卡");
 
     // Phase 4: Code review
     state.phase = "code_review";
@@ -1324,15 +1349,18 @@ export function run_full_pipeline(input: FullPipelineInput): PipelineResult {
       consecutive_failures: 3,
       review_reports: review_results,
     }];
-    run_fault_recovery_phase(fault_events, archive, inventory);
+    const fault_result = run_fault_recovery_phase(fault_events, archive, inventory);
+    if (fault_result.recovery_actions.length === 0) errors.push("故障恢复未执行任何操作");
 
     // Phase 11: Context management
     state.phase = "context_management";
-    const { snapshots } = run_context_management_phase(
+    const ctx_mgmt = run_context_management_phase(
       structure, summary,
       profile ? JSON.stringify(profile) : undefined,
       inventory,
     );
+    const snapshots = ctx_mgmt.snapshots;
+    if (ctx_mgmt.validation_failures > 0) errors.push(`上下文验证失败: ${ctx_mgmt.validation_failures}次`);
 
     // Phase 12: Exit
     state.phase = "exit";
