@@ -81,7 +81,7 @@ import {
 
 // Phase 4: Satisfaction
 import {
-  score_all_members, create_satisfaction_record,
+  create_satisfaction_record,
   process_client_action,
   extract_preference_signals, detect_preference_conflict,
   generate_compromise_options,
@@ -559,10 +559,7 @@ export function run_satisfaction_scoring_phase(
   impacts: ScoreImpact[];
   scored_cards: PersonaCard[];
 } {
-  // Score all members
-  score_all_members(member_inputs);
-
-  // Create record
+  // Create record (create_satisfaction_record internally calls score_all_members)
   let record = create_satisfaction_record(stage_id, group_name, member_inputs);
 
   // Client action
@@ -646,7 +643,7 @@ export function run_lifecycle_management_phase(
   }
 
   // Run lifecycle processes per-context, skipping already-destroyed contexts
-  const processed_statuses = new Set(["DESTROYED", "REFACTORED"]);
+  const processed_statuses = new Set(["DESTROYED"]);
   const skip_adjust = lifecycle_mode === "project_destroy";
 
   for (let i = 0; i < contexts.length; i++) {
@@ -850,6 +847,7 @@ export function run_fault_recovery_phase(
   member_states: MemberFaultState[];
   lead_states: LeadFaultState[];
   recovery_actions: string[];
+  updated_archive: ProjectArchive;
 } {
   const records: FaultRecord[] = [];
   const member_states: MemberFaultState[] = [];
@@ -1019,7 +1017,7 @@ export function run_fault_recovery_phase(
     recovery_actions.push(resolution_note);
   }
 
-  return { records, member_states, lead_states, recovery_actions };
+  return { records, member_states, lead_states, recovery_actions, updated_archive: archive };
 }
 
 // ============ Phase 11: Context Control ============
@@ -1344,7 +1342,7 @@ export function run_full_pipeline(input: FullPipelineInput): PipelineResult {
 
     // Phase 9: Project archive
     state.phase = "project_archive";
-    const { archive } = run_project_archive_phase(
+    let { archive } = run_project_archive_phase(
       summary, structure,
       arb_results.results.map((r) => r.original_conflict),
       [],
@@ -1361,6 +1359,7 @@ export function run_full_pipeline(input: FullPipelineInput): PipelineResult {
       review_reports: review_results,
     }];
     const fault_result = run_fault_recovery_phase(fault_events, archive, inventory);
+    archive = fault_result.updated_archive;
     if (fault_result.recovery_actions.length === 0) errors.push("故障恢复未执行任何操作");
 
     // Phase 11: Context management
