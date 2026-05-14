@@ -1,0 +1,65 @@
+name: Security Audit
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '47 3 * * 0'  # 每周日 03:47 UTC
+
+jobs:
+  secret-scan:
+    name: Secret Scanning
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  dependency-audit:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm audit --audit-level=high
+
+  repo-security:
+    name: Repo Security Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check .claude not tracked
+        run: |
+          if git ls-files | grep -qE '^\.claude/|^CLAUDE\.md$'; then
+            echo "FAIL: .claude/ or CLAUDE.md is tracked!"
+            exit 1
+          fi
+          echo "OK: Claude artifacts excluded"
+
+      - name: Check no credentials in source
+        run: |
+          if grep -rnE 'ghp_[A-Za-z0-9]{36}|AKIA[0-9A-Z]{16}|sk-[A-Za-z0-9_-]{32,}' src/ tests/ --include='*.ts' --include='*.json' --include='*.md'; then
+            echo "FAIL: Potential credentials found in source"
+            exit 1
+          fi
+          echo "OK: No credentials found"
+
+      - name: Check LICENSE exists
+        run: |
+          if [ ! -f LICENSE ]; then
+            echo "FAIL: No LICENSE file"
+            exit 1
+          fi
+          echo "OK: LICENSE present"

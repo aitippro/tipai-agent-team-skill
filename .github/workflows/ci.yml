@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  typecheck:
+    name: Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx tsc --noEmit
+
+  test:
+    name: Test Suite (${{ matrix.suite }})
+    needs: typecheck
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        suite:
+          - test_layer1_schemas
+          - test_schemas
+          - test_constitution
+          - test_interview
+          - test_card_generator
+          - test_team_assembler
+          - test_task_distributor
+          - test_code_reviewer
+          - test_conflict_arbitrator
+          - test_satisfaction_system
+          - test_lifecycle_manager
+          - test_role_inventory
+          - test_project_archive
+          - test_fault_tolerance
+          - test_context_control
+          - test_exit_handler
+          - test_production_orchestrator
+          - test_integration
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx tsx tests/${{ matrix.suite }}.ts
+
+  result:
+    name: CI Result
+    if: always()
+    needs: [typecheck, test]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check results
+        run: |
+          if [ "${{ needs.typecheck.result }}" != "success" ] || [ "${{ needs.test.result }}" != "success" ]; then
+            echo "CI failed"
+            exit 1
+          fi
+          echo "CI passed — 18/18 suites, 623/623 cases"
