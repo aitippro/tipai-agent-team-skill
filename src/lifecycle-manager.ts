@@ -268,8 +268,9 @@ export interface LowScoreEvidence {
 export function check_satisfaction_trigger(
   records: SatisfactionRecord[]
 ): { triggered: boolean; evidence: LowScoreEvidence | null } {
-  // 找最近连续 ≤2 分的记录
+  // 找最近连续 ≤2 分的记录，保留最长连续段的完整证据
   const low_records: SatisfactionRecord[] = [];
+  let best_run: SatisfactionRecord[] = [];
   let max_consecutive = 0;
   let current_consecutive = 0;
 
@@ -280,7 +281,10 @@ export function check_satisfaction_trigger(
     if (record.final_scores.composite <= 2) {
       current_consecutive++;
       low_records.push(record);
-      max_consecutive = Math.max(max_consecutive, current_consecutive);
+      if (current_consecutive > max_consecutive) {
+        max_consecutive = current_consecutive;
+        best_run = [...low_records];
+      }
     } else {
       current_consecutive = 0;
       low_records.length = 0;
@@ -291,7 +295,9 @@ export function check_satisfaction_trigger(
     return { triggered: false, evidence: null };
   }
 
-  const reasons = low_records.slice(-3).map((r) =>
+  // 使用最长连续段的记录（而非可能被截断的最后一段）
+  const evidence_records = best_run.slice(-3);
+  const reasons = evidence_records.map((r) =>
     `阶段 ${r.stage_id}: 综合分 ${r.final_scores.composite}, ` +
     `质量=${r.final_scores.quality}, 标质=${r.final_scores.standard}, ` +
     `协作=${r.final_scores.collaboration}`
@@ -300,7 +306,7 @@ export function check_satisfaction_trigger(
   return {
     triggered: true,
     evidence: {
-      records: low_records.slice(-3),
+      records: evidence_records,
       reasons,
       consecutive_count: max_consecutive,
     },

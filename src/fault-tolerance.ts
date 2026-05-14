@@ -114,12 +114,13 @@ export function handle_single_reject(
 ): { state: MemberFaultState; message: string } {
   const deadline = new Date(Date.now() + action.deadline_hours * 3600 * 1000).toISOString();
 
+  const new_count = state.rejection_count + 1;
   const updated: MemberFaultState = {
     ...state,
-    rejection_count: state.rejection_count + 1,
+    rejection_count: new_count,
     last_rejection_reason: action.reject_reason,
     last_fix_deadline: deadline,
-    status: "warned",
+    status: new_count >= 2 ? "escalated" : "warned",
   };
 
   return {

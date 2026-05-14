@@ -17,6 +17,7 @@ import { PersonaCard, ProjectArchive, RoleInventory, ConflictRecord, Satisfactio
 // Phase 1: Interview
 import {
   create_interview_state, advance_phase, go_back_phase,
+  PHASE_ORDER,
   is_vague_answer, recommend_tech_stack, generate_summary,
   format_summary, create_confirm_state, handle_confirm,
   handle_modify, is_interview_done,
@@ -239,8 +240,8 @@ export function run_interview_phase(answers: Record<string, string[]>): {
   const state = create_interview_state();
   let current: InterviewState = { ...state, answers };
 
-  // Advance through each phase, processing real user answers
-  for (let i = 0; i < 4; i++) {
+  // Advance through all interview phases except INIT (starting) and DONE (terminal)
+  for (let i = 0; i < PHASE_ORDER.length - 2; i++) {
     current = advance_phase(current);
     const phase_answers = current.answers[current.phase] || [];
     for (const ans of phase_answers) {
@@ -556,7 +557,7 @@ export function run_satisfaction_scoring_phase(
   record: SatisfactionRecord;
   profile: PreferenceProfile | null;
   impacts: ScoreImpact[];
-  updated_cards: PersonaCard[];
+  scored_cards: PersonaCard[];
 } {
   // Score all members
   score_all_members(member_inputs);
@@ -589,11 +590,11 @@ export function run_satisfaction_scoring_phase(
 
   // Apply impacts — skip impacts whose target card doesn't exist
   const card_map = new Map(cards.map((c) => [c.name, c]));
-  const updated_cards = impacts
+  const scored_cards = impacts
     .filter((impact) => card_map.has(impact.affected_cards[0]))
     .map((impact) => apply_score_impact(impact, card_map.get(impact.affected_cards[0])!));
 
-  return { record, profile, impacts, updated_cards };
+  return { record, profile, impacts, scored_cards };
 }
 
 // ============ Phase 7: Lifecycle Management ============
@@ -646,6 +647,8 @@ export function run_lifecycle_management_phase(
 
   // Run lifecycle processes per-context, skipping already-destroyed contexts
   const processed_statuses = new Set(["DESTROYED", "REFACTORED"]);
+  const skip_adjust = lifecycle_mode === "project_destroy";
+
   for (const ctx of contexts) {
     if (processed_statuses.has(ctx.state)) {
       actions.push(`Lifecycle skip for ${ctx.card.name}: already ${ctx.state}`);
@@ -663,14 +666,20 @@ export function run_lifecycle_management_phase(
     };
     const per_card_skill = { start: "new", mid: "learning", end: "proficient" };
 
-    // Adjust first (ACTIVE → ADJUSTING), then freeze (ADJUSTING → FROZEN via finish_adjust)
-    const adjust = process_adjust(ctx, "updated requirements");
-    let adjusted_ctx = ctx;
-    if (adjust.ctx) {
-      adjusted_ctx = finish_adjust(adjust.ctx, card);
+    if (skip_adjust) {
+      // project_destroy: 跳过调整与冻结，直接销毁
+      actions.push(`lifecycle_mode=project_destroy: ${card.name} 直接销毁`);
+      /* destroyed= */ process_destroy(ctx, []);
+    } else {
+      // follow_project: 完整生命周期链 (adjust → finish_adjust → freeze → destroy)
+      const adjust = process_adjust(ctx, "updated requirements");
+      let adjusted_ctx = ctx;
+      if (adjust.ctx) {
+        adjusted_ctx = finish_adjust(adjust.ctx, card);
+      }
+      const { ctx: frozen_ctx } = process_freeze(adjusted_ctx, per_card_archive, per_card_skill);
+      /* destroyed= */ process_destroy(frozen_ctx, []);
     }
-    const { ctx: frozen_ctx } = process_freeze(adjusted_ctx, per_card_archive, per_card_skill);
-    /* destroyed= */ process_destroy(frozen_ctx, []);
   }
 
   return { triggered, actions, contexts };
@@ -1316,7 +1325,7 @@ export function run_full_pipeline(input: FullPipelineInput): PipelineResult {
         bonus_items: [],
         penalty_items: [],
       }));
-    const { record, profile, updated_cards } = run_satisfaction_scoring_phase(
+    const { record, profile, scored_cards } = run_satisfaction_scoring_phase(
       "S-001",
       structure.groups[0]?.group_name || "默认组",
       member_inputs,
@@ -1326,11 +1335,11 @@ export function run_full_pipeline(input: FullPipelineInput): PipelineResult {
 
     // Phase 7: Lifecycle management
     state.phase = "lifecycle_management";
-    const lifecycle = run_lifecycle_management_phase(updated_cards, satisfaction_records, input.lifecycle_mode);
+    const lifecycle = run_lifecycle_management_phase(scored_cards, satisfaction_records, input.lifecycle_mode);
 
     // Phase 8: Role inventory
     state.phase = "inventory_management";
-    const { inventory } = run_inventory_management_phase(updated_cards);
+    const { inventory } = run_inventory_management_phase(scored_cards);
 
     // Phase 9: Project archive
     state.phase = "project_archive";
