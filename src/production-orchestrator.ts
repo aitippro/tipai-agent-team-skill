@@ -533,7 +533,7 @@ export function run_conflict_arbitration_phase(
   for (const conflict of pipeline_results.conflicts) {
     const neg = create_negotiation(conflict.conflict_id, 2);
     let neg_state = neg;
-    // Simulate 1 round
+    neg_state = record_negotiation_round(neg_state);
     neg_state = record_negotiation_round(neg_state);
     if (check_negotiation_timeout(neg_state)) {
       const escalated = escalate_to_main_agent(neg_state, conflict);
@@ -649,7 +649,8 @@ export function run_lifecycle_management_phase(
   const processed_statuses = new Set(["DESTROYED", "REFACTORED"]);
   const skip_adjust = lifecycle_mode === "project_destroy";
 
-  for (const ctx of contexts) {
+  for (let i = 0; i < contexts.length; i++) {
+    const ctx = contexts[i];
     if (processed_statuses.has(ctx.state)) {
       actions.push(`Lifecycle skip for ${ctx.card.name}: already ${ctx.state}`);
       continue;
@@ -667,18 +668,18 @@ export function run_lifecycle_management_phase(
     const per_card_skill = { start: "new", mid: "learning", end: "proficient" };
 
     if (skip_adjust) {
-      // project_destroy: 跳过调整与冻结，直接销毁
       actions.push(`lifecycle_mode=project_destroy: ${card.name} 直接销毁`);
-      /* destroyed= */ process_destroy(ctx, []);
+      const { ctx: destroyed_ctx } = process_destroy(ctx, []);
+      contexts[i] = destroyed_ctx;
     } else {
-      // follow_project: 完整生命周期链 (adjust → finish_adjust → freeze → destroy)
       const adjust = process_adjust(ctx, "updated requirements");
       let adjusted_ctx = ctx;
       if (adjust.ctx) {
         adjusted_ctx = finish_adjust(adjust.ctx, card);
       }
       const { ctx: frozen_ctx } = process_freeze(adjusted_ctx, per_card_archive, per_card_skill);
-      /* destroyed= */ process_destroy(frozen_ctx, []);
+      const { ctx: destroyed_ctx } = process_destroy(frozen_ctx, []);
+      contexts[i] = destroyed_ctx;
     }
   }
 
@@ -890,7 +891,7 @@ export function run_fault_recovery_phase(
       const state: MemberFaultState = {
         member_name: event.role_name,
         group_name: "default",
-        rejection_count: event.consecutive_failures,
+        rejection_count: Math.max(0, event.consecutive_failures - 1),
         rejected_reports: event.review_reports || [],
         status: "active",
       };
@@ -948,7 +949,7 @@ export function run_fault_recovery_phase(
       const state: LeadFaultState = {
         lead_name: event.role_name,
         group_name: "default",
-        audit_miss_count: event.consecutive_failures,
+        audit_miss_count: Math.max(0, event.consecutive_failures - 1),
         negotiation_timeouts: event.negotiation_timeout ? 1 : 0,
         warnings: [],
         status: "active",

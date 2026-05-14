@@ -517,14 +517,10 @@ export function restore_from_snapshot(
 
   if (available.length === 0) return { snapshot: null, available: role_snapshots };
 
-  // 最近快照解析回对象
   const snapshot = available[0];
   try {
-    const parsed = {
-      ...snapshot,
-      parsed_content: JSON.parse(snapshot.content),
-    } as ContextSnapshot & { parsed_content: object };
-    return { snapshot: parsed, available: role_snapshots };
+    JSON.parse(snapshot.content);
+    return { snapshot, available: role_snapshots };
   } catch {
     return { snapshot: null, available: role_snapshots };
   }
@@ -539,7 +535,7 @@ export function batch_create_snapshots(
 ): ContextSnapshot[] {
   const new_snapshots = [...existing_snapshots];
   for (const r of roles) {
-    new_snapshots.push(create_context_snapshot(r.name, r.level, r.content, existing_snapshots));
+    new_snapshots.push(create_context_snapshot(r.name, r.level, r.content, new_snapshots));
   }
   return new_snapshots;
 }

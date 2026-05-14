@@ -583,7 +583,7 @@ test("T-0050: restore_from_snapshot 恢复最近快照", () => {
   const s2 = create_context_snapshot("张三", "member", { task: "new" }, [s1]);
   const result = restore_from_snapshot("张三", [s1, s2]);
   return result.snapshot !== null &&
-    (result.snapshot as any).parsed_content.task === "new";
+    JSON.parse(result.snapshot!.content).task === "new";
 });
 
 test("T-0050: restore_from_snapshot — 无快照返回 null", () => {

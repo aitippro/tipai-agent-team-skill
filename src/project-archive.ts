@@ -32,19 +32,22 @@ export interface ArchiveInput {
  */
 export function generate_project_archive(input: ArchiveInput): ProjectArchive {
   // 计算满意度总评
-  const group_avg: Record<string, number> = {};
+  const group_sum: Record<string, number> = {};
+  const group_count: Record<string, number> = {};
   let total_satisfaction = 0;
   let satisfaction_count = 0;
 
   for (const record of input.satisfaction_records) {
     const score = record.final_scores.composite;
-    if (!group_avg[record.group_name]) {
-      group_avg[record.group_name] = score;
-    } else {
-      group_avg[record.group_name] = (group_avg[record.group_name] + score) / 2;
-    }
+    group_sum[record.group_name] = (group_sum[record.group_name] || 0) + score;
+    group_count[record.group_name] = (group_count[record.group_name] || 0) + 1;
     total_satisfaction += score;
     satisfaction_count++;
+  }
+
+  const group_avg: Record<string, number> = {};
+  for (const name of Object.keys(group_sum)) {
+    group_avg[name] = Math.round((group_sum[name] / group_count[name]) * 100) / 100;
   }
 
   const project_avg = satisfaction_count > 0
