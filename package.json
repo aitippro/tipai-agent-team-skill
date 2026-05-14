@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "test": "npx tsx tests/test_constitution.ts",
+    "test": "npx tsx tests/test_layer1_schemas.ts && npx tsx tests/test_schemas.ts && npx tsx tests/test_constitution.ts && npx tsx tests/test_interview.ts && npx tsx tests/test_card_generator.ts && npx tsx tests/test_team_assembler.ts && npx tsx tests/test_task_distributor.ts && npx tsx tests/test_code_reviewer.ts && npx tsx tests/test_conflict_arbitrator.ts && npx tsx tests/test_satisfaction_system.ts && npx tsx tests/test_lifecycle_manager.ts && npx tsx tests/test_role_inventory.ts && npx tsx tests/test_project_archive.ts && npx tsx tests/test_fault_tolerance.ts && npx tsx tests/test_context_control.ts && npx tsx tests/test_exit_handler.ts && npx tsx tests/test_production_orchestrator.ts && npx tsx tests/test_integration.ts",
     "check": "npx tsc --noEmit"
   },
   "devDependencies": {

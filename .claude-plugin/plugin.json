@@ -1,8 +1,10 @@
 {
   "name": "agent-team",
-  "description": "TipAI Agent Team Skill — 层级 Agent 团队协作系统。激活后进入 Agent Team 模式，自动执行需求采访、人物卡生成、层级组队、代码审查、冲突仲裁、满意度评估。",
+  "version": "0.1.0",
+  "description": "TipAI Agent Team Skill — 层级 Agent 团队协作系统。将 Claude Code 从单 Agent 升级为 Agent Swarm，覆盖 14 阶段完整工作流：需求采访 → 人物卡生成 → 层级组队 → 任务下发 → 代码审查 → 冲突仲裁 → 满意度评估 → 生命周期管理 → 角色库存 → 项目档案。",
   "author": {
-    "name": "aitippro",
-    "email": "aitippro@github"
-  }
+    "name": "TipAI",
+    "url": "https://github.com/aitippro/tipai-agent-team-skill"
+  },
+  "keywords": ["claude-code", "agent-team", "agent-swarm", "skill", "ai-agent", "team-orchestration"]
 }
